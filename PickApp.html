@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Magazzino Scanner</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+body{
+    margin:0;
+    font-family: Inter, sans-serif;
+    background:#f5f7fa;
+    color:#222;
+}
+
+header{
+    background:#1e293b;
+    color:white;
+    padding:14px;
+    text-align:center;
+    font-weight:600;
+    font-size:18px;
+}
+
+.container{
+    padding:12px;
+}
+
+.card{
+    background:white;
+    border-radius:12px;
+    padding:12px;
+    margin-bottom:12px;
+    box-shadow:0 3px 10px rgba(0,0,0,0.08);
+}
+
+#scanner{
+    width:100%;
+    min-height:220px;
+}
+
+button{
+    width:100%;
+    padding:18px;
+    border:none;
+    border-radius:12px;
+    font-size:20px;
+    font-weight:600;
+    margin-top:10px;
+}
+
+.pick{
+    background:#16a34a;
+    color:white;
+}
+
+.clear{
+    background:#ef4444;
+    color:white;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:14px;
+}
+
+td, th{
+    padding:6px;
+    border-bottom:1px solid #eee;
+}
+
+.signature{
+    border:2px dashed #ccc;
+    border-radius:10px;
+}
+</style>
+</head>
+
+<body>
+
+<header>Magazzino - Scanner Prelievi</header>
+
+<div class="container">
+
+<div class="card">
+<h3>Firma Operatore</h3>
+<canvas id="signature" class="signature" width="350" height="120"></canvas>
+<button class="clear" onclick="clearSignature()">Cancella Firma</button>
+</div>
+
+<div class="card">
+<h3>Scanner Barcode</h3>
+<div id="scanner"></div>
+<div>Codice: <b id="barcode">---</b></div>
+</div>
+
+<div class="card">
+<button class="pick" onclick="pickItem()">PICK ITEM</button>
+</div>
+
+<div class="card">
+<h3>Movimenti</h3>
+<table id="table">
+<thead>
+<tr>
+<th>Ora</th>
+<th>Barcode</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+
+</div>
+
+<script>
+
+let currentCode = "";
+let movements = [];
+
+/* ======================
+   SCANNER
+====================== */
+
+const scanner = new Html5Qrcode("scanner");
+
+scanner.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 250 },
+    code => {
+        currentCode = code;
+        document.getElementById("barcode").innerText = code;
+    }
+);
+
+/* ======================
+   SIGNATURE PAD
+====================== */
+
+const canvas = document.getElementById("signature");
+const ctx = canvas.getContext("2d");
+let drawing = false;
+
+canvas.addEventListener("touchstart", e => {
+    drawing = true;
+    draw(e.touches[0]);
+});
+
+canvas.addEventListener("touchmove", e => {
+    if(drawing) draw(e.touches[0]);
+});
+
+canvas.addEventListener("touchend", () => drawing=false);
+
+function draw(touch){
+    const rect = canvas.getBoundingClientRect();
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineTo(touch.clientX-rect.left, touch.clientY-rect.top);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(touch.clientX-rect.left, touch.clientY-rect.top);
+}
+
+function clearSignature(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
+/* ======================
+   PICK ACTION
+====================== */
+
+function pickItem(){
+
+    if(!currentCode){
+        alert("Scansiona prima un barcode");
+        return;
+    }
+
+    const time = new Date().toLocaleTimeString();
+
+    movements.unshift({
+        time,
+        code: currentCode
+    });
+
+    updateTable();
+
+    currentCode="";
+    document.getElementById("barcode").innerText="---";
+}
+
+function updateTable(){
+
+    const tbody = document.querySelector("#table tbody");
+    tbody.innerHTML="";
+
+    movements.forEach(m=>{
+        tbody.innerHTML += `
+        <tr>
+            <td>${m.time}</td>
+            <td>${m.code}</td>
+        </tr>`;
+    });
+}
+
+</script>
+
+</body>
+</html>
