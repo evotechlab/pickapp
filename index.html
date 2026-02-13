@@ -3,54 +3,72 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Magazzino Scanner</title>
+<title>WMS - PickApp</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <style>
 body{
     margin:0;
     font-family: Inter, sans-serif;
-    background:#f5f7fa;
-    color:#222;
+    background:#f1f5f9;
+    color:#0f172a;
 }
 
 header{
-    background:#1e293b;
+    background:#0f172a;
     color:white;
-    padding:14px;
+    padding:16px;
     text-align:center;
     font-weight:600;
     font-size:18px;
 }
 
 .container{
-    padding:12px;
+    padding:14px;
 }
 
 .card{
     background:white;
-    border-radius:12px;
-    padding:12px;
-    margin-bottom:12px;
-    box-shadow:0 3px 10px rgba(0,0,0,0.08);
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:14px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.08);
+}
+
+h3{
+    margin:0 0 10px 0;
+    font-size:16px;
+}
+
+input{
+    width:100%;
+    padding:14px;
+    border-radius:10px;
+    border:1px solid #cbd5e1;
+    font-size:16px;
 }
 
 #scanner{
     width:100%;
-    min-height:220px;
+    min-height:200px;
+}
+
+.status{
+    margin-top:8px;
+    font-size:15px;
 }
 
 button{
     width:100%;
     padding:18px;
     border:none;
-    border-radius:12px;
+    border-radius:14px;
     font-size:20px;
     font-weight:600;
     margin-top:10px;
+    cursor:pointer;
 }
 
 .pick{
@@ -58,9 +76,28 @@ button{
     color:white;
 }
 
-.clear{
-    background:#ef4444;
-    color:white;
+.pick:disabled{
+    background:#94a3b8;
+}
+
+.success{
+    background:#dcfce7;
+    color:#166534;
+    padding:10px;
+    border-radius:10px;
+    margin-top:10px;
+    text-align:center;
+    font-weight:600;
+}
+
+.error{
+    background:#fee2e2;
+    color:#991b1b;
+    padding:10px;
+    border-radius:10px;
+    margin-top:10px;
+    text-align:center;
+    font-weight:600;
 }
 
 table{
@@ -70,49 +107,52 @@ table{
 }
 
 td, th{
-    padding:6px;
-    border-bottom:1px solid #eee;
+    padding:8px;
+    border-bottom:1px solid #e2e8f0;
+    text-align:left;
 }
 
-.signature{
-    border:2px dashed #ccc;
-    border-radius:10px;
+th{
+    font-weight:600;
 }
 </style>
 </head>
 
 <body>
 
-<header>Magazzino - Scanner Prelievi</header>
+<header>WMS - Pick Scanner</header>
 
 <div class="container">
 
 <div class="card">
-<h3>Firma Operatore</h3>
-<canvas id="signature" class="signature" width="350" height="120"></canvas>
-<button class="clear" onclick="clearSignature()">Cancella Firma</button>
+<h3>Operatore</h3>
+<input type="text" id="operatore" placeholder="Inserisci nome operatore">
 </div>
 
 <div class="card">
 <h3>Scanner Barcode</h3>
 <div id="scanner"></div>
-<div>Codice: <b id="barcode">---</b></div>
+<div class="status">
+Codice: <b id="barcode">---</b>
+</div>
+<div id="feedback"></div>
 </div>
 
 <div class="card">
-<button class="pick" onclick="pickItem()">PICK ITEM</button>
+<button id="pickBtn" class="pick" onclick="pickItem()">PICK</button>
 </div>
 
 <div class="card">
-<h3>Movimenti</h3>
-<table id="table">
+<h3>Movimenti Locali</h3>
+<table>
 <thead>
 <tr>
 <th>Ora</th>
+<th>Operatore</th>
 <th>Barcode</th>
 </tr>
 </thead>
-<tbody></tbody>
+<tbody id="tableBody"></tbody>
 </table>
 </div>
 
@@ -120,8 +160,19 @@ td, th{
 
 <script>
 
+/* ======================
+   CONFIG DROPBOX
+====================== */
+
+const DROPBOX_TOKEN = "k026s39y9cnq8y1";
+
+/* ======================
+   STATE
+====================== */
+
 let currentCode = "";
 let movements = [];
+let uploading = false;
 
 /* ======================
    SCANNER
@@ -131,85 +182,146 @@ const scanner = new Html5Qrcode("scanner");
 
 scanner.start(
     { facingMode: "environment" },
-    { fps: 10, qrbox: 250 },
-    code => {
-        currentCode = code;
-        document.getElementById("barcode").innerText = code;
+    {
+        fps: 12,
+        qrbox: { width: 350, height: 150 },
+        aspectRatio: 1.77
+    },
+    (decodedText) => {
+        currentCode = decodedText;
+        document.getElementById("barcode").innerText = decodedText;
+        navigator.vibrate?.(100);
     }
 );
 
 /* ======================
-   SIGNATURE PAD
+   DROPBOX UPLOAD
 ====================== */
 
-const canvas = document.getElementById("signature");
-const ctx = canvas.getContext("2d");
-let drawing = false;
+async function uploadToDropbox(data){
 
-canvas.addEventListener("touchstart", e => {
-    drawing = true;
-    draw(e.touches[0]);
-});
+    const filename = `/movimenti/${Date.now()}_${crypto.randomUUID()}.json`;
 
-canvas.addEventListener("touchmove", e => {
-    if(drawing) draw(e.touches[0]);
-});
+    const response = await fetch("https://content.dropboxapi.com/2/files/upload", {
+        method: "POST",
+        headers: {
+            "Authorization": "Bearer " + DROPBOX_TOKEN,
+            "Content-Type": "application/octet-stream",
+            "Dropbox-API-Arg": JSON.stringify({
+                path: filename,
+                mode: "add",
+                autorename: true
+            })
+        },
+        body: JSON.stringify(data)
+    });
 
-canvas.addEventListener("touchend", () => drawing=false);
+    if(!response.ok){
+        const err = await response.text();
+        throw new Error(err);
+    }
 
-function draw(touch){
-    const rect = canvas.getBoundingClientRect();
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-    ctx.lineTo(touch.clientX-rect.left, touch.clientY-rect.top);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(touch.clientX-rect.left, touch.clientY-rect.top);
-}
-
-function clearSignature(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+    return true;
 }
 
 /* ======================
    PICK ACTION
 ====================== */
 
-function pickItem(){
+async function pickItem(){
 
-    if(!currentCode){
-        alert("Scansiona prima un barcode");
+    if(uploading) return;
+
+    const operatore = document.getElementById("operatore").value.trim();
+    const pickBtn = document.getElementById("pickBtn");
+
+    if(!operatore){
+        alert("Inserisci nome operatore");
         return;
     }
 
-    const time = new Date().toLocaleTimeString();
+    if(!currentCode){
+        alert("Scansiona un barcode");
+        return;
+    }
 
-    movements.unshift({
-        time,
-        code: currentCode
-    });
+    uploading = true;
+    pickBtn.disabled = true;
 
-    updateTable();
+    const now = new Date();
 
-    currentCode="";
-    document.getElementById("barcode").innerText="---";
+    const movement = {
+        timestamp: now.toISOString(),
+        time_local: now.toLocaleTimeString(),
+        operatore,
+        barcode: currentCode,
+        azione: "pick",
+        device: "webapp"
+    };
+
+    try{
+
+        await uploadToDropbox(movement);
+
+        movements.unshift({
+            time: movement.time_local,
+            operatore,
+            barcode: currentCode
+        });
+
+        updateTable();
+        showSuccess("Movimento inviato a Dropbox");
+
+        currentCode = "";
+        document.getElementById("barcode").innerText = "---";
+
+    }catch(error){
+
+        console.error(error);
+        showError("Errore upload Dropbox");
+
+    }
+
+    uploading = false;
+    pickBtn.disabled = false;
 }
 
-function updateTable(){
+/* ======================
+   TABLE UPDATE
+====================== */
 
-    const tbody = document.querySelector("#table tbody");
-    tbody.innerHTML="";
+function updateTable(){
+    const tbody = document.getElementById("tableBody");
+    tbody.innerHTML = "";
 
     movements.forEach(m=>{
         tbody.innerHTML += `
         <tr>
             <td>${m.time}</td>
-            <td>${m.code}</td>
+            <td>${m.operatore}</td>
+            <td>${m.barcode}</td>
         </tr>`;
     });
+}
+
+/* ======================
+   FEEDBACK UI
+====================== */
+
+function showSuccess(msg){
+    const fb = document.getElementById("feedback");
+    fb.innerHTML = `<div class="success">${msg}</div>`;
+    setTimeout(()=> fb.innerHTML = "", 2000);
+}
+
+function showError(msg){
+    const fb = document.getElementById("feedback");
+    fb.innerHTML = `<div class="error">${msg}</div>`;
+    setTimeout(()=> fb.innerHTML = "", 3000);
 }
 
 </script>
 
 </body>
 </html>
+
