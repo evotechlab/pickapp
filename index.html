@@ -160,39 +160,70 @@ Codice: <b id="barcode">---</b>
 
 <script>
 
-/* ======================
-   DROPBOX CONFIG
-====================== */
+/* =========================
+   CONFIG
+========================= */
 
 const DROPBOX_APP_KEY = "k026s39y9cnq8y1";
 const DROPBOX_FOLDER = "/movimenti";
+const redirectUri = "https://evotechlab.github.io/pickapp/"; // ← METTI URL ESATTO MOBILE
 
 let accessToken = localStorage.getItem("db_access");
 let refreshToken = localStorage.getItem("db_refresh");
 
-/* ======================
-   DROPBOX AUTH INIT
-====================== */
+/* =========================
+   PKCE HELPERS
+========================= */
+
+function generateRandomString(length) {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let result = "";
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+async function sha256base64url(str) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    const hash = await crypto.subtle.digest("SHA-256", data);
+    return btoa(String.fromCharCode(...new Uint8Array(hash)))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+}
+
+/* =========================
+   AUTH
+========================= */
 
 async function initDropboxAuth() {
 
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
 
-    // Se ritorna da Dropbox con authorization code
     if (code && !accessToken) {
+
+        const codeVerifier = sessionStorage.getItem("pkce_code_verifier");
 
         const response = await fetch("https://api.dropboxapi.com/oauth2/token", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded"
-            },
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({
-                code: code,
+                code,
                 grant_type: "authorization_code",
-                client_id: DROPBOX_APP_KEY
+                client_id: DROPBOX_APP_KEY,
+                redirect_uri: redirectUri,
+                code_verifier: codeVerifier
             })
         });
+
+        if (!response.ok) {
+            localStorage.clear();
+            location.reload();
+            return;
+        }
 
         const data = await response.json();
 
@@ -202,38 +233,38 @@ async function initDropboxAuth() {
         localStorage.setItem("db_access", accessToken);
         localStorage.setItem("db_refresh", refreshToken);
 
-        window.history.replaceState({}, document.title, window.location.pathname);
+        window.history.replaceState({}, document.title, redirectUri);
     }
 
-    // Se non autenticato → redirect OAuth
     if (!accessToken && !refreshToken) {
 
-        const redirectUri = window.location.href;
+        const codeVerifier = generateRandomString(64);
+        const codeChallenge = await sha256base64url(codeVerifier);
+
+        sessionStorage.setItem("pkce_code_verifier", codeVerifier);
 
         const authUrl =
             `https://www.dropbox.com/oauth2/authorize` +
             `?client_id=${DROPBOX_APP_KEY}` +
             `&response_type=code` +
             `&token_access_type=offline` +
-            `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+            `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+            `&code_challenge=${codeChallenge}` +
+            `&code_challenge_method=S256`;
 
         window.location.href = authUrl;
     }
 }
 
-/* ======================
-   REFRESH TOKEN
-====================== */
+/* =========================
+   REFRESH
+========================= */
 
 async function refreshAccessToken() {
 
-    if (!refreshToken) return;
-
     const response = await fetch("https://api.dropboxapi.com/oauth2/token", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-        },
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
             grant_type: "refresh_token",
             refresh_token: refreshToken,
@@ -241,33 +272,54 @@ async function refreshAccessToken() {
         })
     });
 
-    const data = await response.json();
+    if (!response.ok) {
+        localStorage.clear();
+        location.reload();
+        return;
+    }
 
+    const data = await response.json();
     accessToken = data.access_token;
     localStorage.setItem("db_access", accessToken);
 }
 
-/* ======================
-   STATE
-====================== */
+/* =========================
+   DROPBOX WRAPPER
+========================= */
+
+async function dropboxFetch(url, options = {}) {
+
+    options.headers = options.headers || {};
+    options.headers["Authorization"] = "Bearer " + accessToken;
+
+    let response = await fetch(url, options);
+
+    if (response.status === 401 && refreshToken) {
+        await refreshAccessToken();
+        options.headers["Authorization"] = "Bearer " + accessToken;
+        response = await fetch(url, options);
+    }
+
+    if (!response.ok) {
+        throw new Error("Dropbox API error");
+    }
+
+    return response;
+}
+
+/* =========================
+   SCANNER
+========================= */
 
 let currentCode = "";
 let movements = [];
 let uploading = false;
 
-/* ======================
-   SCANNER
-====================== */
-
 const scanner = new Html5Qrcode("scanner");
 
 scanner.start(
     { facingMode: "environment" },
-    {
-        fps: 12,
-        qrbox: { width: 350, height: 150 },
-        aspectRatio: 1.77
-    },
+    { fps: 12, qrbox: { width: 350, height: 150 }, aspectRatio: 1.77 },
     (decodedText) => {
         currentCode = decodedText;
         document.getElementById("barcode").innerText = decodedText;
@@ -275,153 +327,93 @@ scanner.start(
     }
 );
 
-/* ======================
-   DROPBOX UPLOAD
-====================== */
+/* =========================
+   UPLOAD
+========================= */
 
 async function uploadToDropbox(data) {
 
-    if (!accessToken && refreshToken) {
-        await refreshAccessToken();
-    }
-
     const filename = `${DROPBOX_FOLDER}/${Date.now()}_${crypto.randomUUID()}.json`;
 
-    const response = await fetch("https://content.dropboxapi.com/2/files/upload", {
-        method: "POST",
-        headers: {
-            "Authorization": "Bearer " + accessToken,
-            "Content-Type": "application/octet-stream",
-            "Dropbox-API-Arg": JSON.stringify({
-                path: filename,
-                mode: "add",
-                autorename: true
-            })
-        },
-        body: JSON.stringify(data)
-    });
-
-    // Se token scaduto → refresh automatico
-    if (response.status === 401 && refreshToken) {
-        await refreshAccessToken();
-        return uploadToDropbox(data);
-    }
-
-    if (!response.ok) {
-        const err = await response.text();
-        throw new Error(err);
-    }
-
-    return true;
+    await dropboxFetch(
+        "https://content.dropboxapi.com/2/files/upload",
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/octet-stream",
+                "Dropbox-API-Arg": JSON.stringify({
+                    path: filename,
+                    mode: "add",
+                    autorename: true
+                })
+            },
+            body: JSON.stringify(data)
+        }
+    );
 }
 
-/* ======================
-   PICK ACTION
-====================== */
+/* =========================
+   PICK
+========================= */
 
 async function pickItem() {
 
     if (uploading) return;
 
     const operatore = document.getElementById("operatore").value.trim();
-    const pickBtn = document.getElementById("pickBtn");
-
-    if (!operatore) {
-        alert("Inserisci nome operatore");
-        return;
-    }
-
-    if (!currentCode) {
-        alert("Scansiona un barcode");
-        return;
-    }
+    if (!operatore || !currentCode) return;
 
     uploading = true;
-    pickBtn.disabled = true;
-
-    const now = new Date();
 
     const movement = {
-        timestamp: now.toISOString(),
-        time_local: now.toLocaleTimeString(),
+        timestamp: new Date().toISOString(),
         operatore,
         barcode: currentCode,
         azione: "pick",
-        device: "webapp"
+        device: "mobile"
     };
 
     try {
-
         await uploadToDropbox(movement);
-
-        movements.unshift({
-            time: movement.time_local,
-            operatore,
-            barcode: currentCode
-        });
-
-        updateTable();
-        showSuccess("Movimento inviato su Dropbox");
-
+        showSuccess("Movimento inviato");
         currentCode = "";
         document.getElementById("barcode").innerText = "---";
-
-    } catch (error) {
-
-        console.error(error);
-        showError("Errore upload Dropbox");
-
+    } catch {
+        showError("Errore upload");
     }
 
     uploading = false;
-    pickBtn.disabled = false;
 }
 
-/* ======================
-   TABLE UPDATE
-====================== */
+/* =========================
+   FEEDBACK
+========================= */
 
-function updateTable() {
-    const tbody = document.getElementById("tableBody");
-    tbody.innerHTML = "";
-
-    movements.forEach(m => {
-        tbody.innerHTML += `
-        <tr>
-            <td>${m.time}</td>
-            <td>${m.operatore}</td>
-            <td>${m.barcode}</td>
-        </tr>`;
-    });
-}
-
-/* ======================
-   FEEDBACK UI
-====================== */
-
-function showSuccess(msg) {
+function showSuccess(msg){
     const fb = document.getElementById("feedback");
     fb.innerHTML = `<div class="success">${msg}</div>`;
-    setTimeout(() => fb.innerHTML = "", 2000);
+    setTimeout(()=> fb.innerHTML = "", 2000);
 }
 
-function showError(msg) {
+function showError(msg){
     const fb = document.getElementById("feedback");
     fb.innerHTML = `<div class="error">${msg}</div>`;
-    setTimeout(() => fb.innerHTML = "", 3000);
+    setTimeout(()=> fb.innerHTML = "", 3000);
 }
 
-/* ======================
-   INIT AUTH
-====================== */
+/* =========================
+   INIT
+========================= */
 
 initDropboxAuth();
 
 </script>
 
 
+
 </body>
 </html>
+
 
 
 
