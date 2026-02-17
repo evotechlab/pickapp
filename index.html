@@ -161,18 +161,91 @@ Codice: <b id="barcode">---</b>
 <script>
 
 /* ======================
-   CONFIG DROPBOX
+   DROPBOX CONFIG
 ====================== */
-const DROPBOX_APP_KEY = "k026s39y9cnq8y1";
-const DROPBOX_FOLDER = "";
 
-let shots = [];
+const DROPBOX_APP_KEY = "k026s39y9cnq8y1";
+const DROPBOX_FOLDER = "/movimenti";
+
 let accessToken = localStorage.getItem("db_access");
 let refreshToken = localStorage.getItem("db_refresh");
 
-const video = document.getElementById("video");
-const shoot = document.getElementById("shoot");
-const previewBar = document.getElementById("previewBar");
+/* ======================
+   DROPBOX AUTH INIT
+====================== */
+
+async function initDropboxAuth() {
+
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+
+    // Se ritorna da Dropbox con authorization code
+    if (code && !accessToken) {
+
+        const response = await fetch("https://api.dropboxapi.com/oauth2/token", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: new URLSearchParams({
+                code: code,
+                grant_type: "authorization_code",
+                client_id: DROPBOX_APP_KEY
+            })
+        });
+
+        const data = await response.json();
+
+        accessToken = data.access_token;
+        refreshToken = data.refresh_token;
+
+        localStorage.setItem("db_access", accessToken);
+        localStorage.setItem("db_refresh", refreshToken);
+
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // Se non autenticato → redirect OAuth
+    if (!accessToken && !refreshToken) {
+
+        const redirectUri = window.location.href;
+
+        const authUrl =
+            `https://www.dropbox.com/oauth2/authorize` +
+            `?client_id=${DROPBOX_APP_KEY}` +
+            `&response_type=code` +
+            `&token_access_type=offline` +
+            `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+        window.location.href = authUrl;
+    }
+}
+
+/* ======================
+   REFRESH TOKEN
+====================== */
+
+async function refreshAccessToken() {
+
+    if (!refreshToken) return;
+
+    const response = await fetch("https://api.dropboxapi.com/oauth2/token", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({
+            grant_type: "refresh_token",
+            refresh_token: refreshToken,
+            client_id: DROPBOX_APP_KEY
+        })
+    });
+
+    const data = await response.json();
+
+    accessToken = data.access_token;
+    localStorage.setItem("db_access", accessToken);
+}
 
 /* ======================
    STATE
@@ -206,14 +279,18 @@ scanner.start(
    DROPBOX UPLOAD
 ====================== */
 
-async function uploadToDropbox(data){
+async function uploadToDropbox(data) {
 
-    const filename = `/movimenti/${Date.now()}_${crypto.randomUUID()}.json`;
+    if (!accessToken && refreshToken) {
+        await refreshAccessToken();
+    }
+
+    const filename = `${DROPBOX_FOLDER}/${Date.now()}_${crypto.randomUUID()}.json`;
 
     const response = await fetch("https://content.dropboxapi.com/2/files/upload", {
         method: "POST",
         headers: {
-            "Authorization": "Bearer " + DROPBOX_TOKEN,
+            "Authorization": "Bearer " + accessToken,
             "Content-Type": "application/octet-stream",
             "Dropbox-API-Arg": JSON.stringify({
                 path: filename,
@@ -224,7 +301,13 @@ async function uploadToDropbox(data){
         body: JSON.stringify(data)
     });
 
-    if(!response.ok){
+    // Se token scaduto → refresh automatico
+    if (response.status === 401 && refreshToken) {
+        await refreshAccessToken();
+        return uploadToDropbox(data);
+    }
+
+    if (!response.ok) {
         const err = await response.text();
         throw new Error(err);
     }
@@ -236,19 +319,19 @@ async function uploadToDropbox(data){
    PICK ACTION
 ====================== */
 
-async function pickItem(){
+async function pickItem() {
 
-    if(uploading) return;
+    if (uploading) return;
 
     const operatore = document.getElementById("operatore").value.trim();
     const pickBtn = document.getElementById("pickBtn");
 
-    if(!operatore){
+    if (!operatore) {
         alert("Inserisci nome operatore");
         return;
     }
 
-    if(!currentCode){
+    if (!currentCode) {
         alert("Scansiona un barcode");
         return;
     }
@@ -267,7 +350,7 @@ async function pickItem(){
         device: "webapp"
     };
 
-    try{
+    try {
 
         await uploadToDropbox(movement);
 
@@ -278,12 +361,12 @@ async function pickItem(){
         });
 
         updateTable();
-        showSuccess("Movimento inviato a Dropbox");
+        showSuccess("Movimento inviato su Dropbox");
 
         currentCode = "";
         document.getElementById("barcode").innerText = "---";
 
-    }catch(error){
+    } catch (error) {
 
         console.error(error);
         showError("Errore upload Dropbox");
@@ -298,11 +381,11 @@ async function pickItem(){
    TABLE UPDATE
 ====================== */
 
-function updateTable(){
+function updateTable() {
     const tbody = document.getElementById("tableBody");
     tbody.innerHTML = "";
 
-    movements.forEach(m=>{
+    movements.forEach(m => {
         tbody.innerHTML += `
         <tr>
             <td>${m.time}</td>
@@ -316,22 +399,30 @@ function updateTable(){
    FEEDBACK UI
 ====================== */
 
-function showSuccess(msg){
+function showSuccess(msg) {
     const fb = document.getElementById("feedback");
     fb.innerHTML = `<div class="success">${msg}</div>`;
-    setTimeout(()=> fb.innerHTML = "", 2000);
+    setTimeout(() => fb.innerHTML = "", 2000);
 }
 
-function showError(msg){
+function showError(msg) {
     const fb = document.getElementById("feedback");
     fb.innerHTML = `<div class="error">${msg}</div>`;
-    setTimeout(()=> fb.innerHTML = "", 3000);
+    setTimeout(() => fb.innerHTML = "", 3000);
 }
+
+/* ======================
+   INIT AUTH
+====================== */
+
+initDropboxAuth();
 
 </script>
 
+
 </body>
 </html>
+
 
 
 
