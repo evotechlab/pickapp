@@ -163,9 +163,16 @@ Codice: <b id="barcode">---</b>
 /* ======================
    CONFIG DROPBOX
 ====================== */
+const DROPBOX_APP_KEY = "k026s39y9cnq8y1";
+const DROPBOX_FOLDER = "";
 
+let shots = [];
+let accessToken = localStorage.getItem("db_access");
+let refreshToken = localStorage.getItem("db_refresh");
 
-const DROPBOX_TOKEN = "sl.u.AGQ4m5BrBneKQ0PXss5TodqIOJmoQhrmMkvoxiwDGag3J_WqG3RtjWMFowvnOYSrP5c_O2QMrac-YLfZzKK6kMZ--d39fvXjgClks1hMlea7GA89DI1uj3gJrP2cGN9NRPohVBJLpVVdy_VRhOezRYfvOPBM8YIkO08-bKF4XTPZhWOGEZErfee7BMNqWQZc3VUQcB5vpaVLKQ2yk2V6mPaX3433hF5wdlf-s9fr_IVJLePzLkt6Adl2-ed8Vw4hmXJBLqKIgrkMmi9wxu09QiYhdjftgU5myrs31Mm4HwB-CwSJwv--KRLFSIo1F-xMmCoxmIb9PQZsYZqLX8IYZ8MxEUBeJbW-4oTUDBa58s5g3aIA1gEq4F0ORGZplsa7IDmy8zow9rpzscH90nGPnEk2Uls19Om4KJ9spqAojhzX052U8QaiFzTmYW7v0hzrN_Vw7aYHf9NIx6sSdEAHYnWtQ9S10-8JH79RGpo-DEkOl7MjSIra9CKnQEKIHaJTY_p6-ExG-Uu-pZdkykvC6hbxbH0FLFtGSF82JyuWEBgxfXzKbQ0xoFlMowmZxVpqTwctSpzOuaz67-LP7o1xHT489huV50uvkHn-UVYwDuGX26g7rC-aLa2fu05abF4HG9fkq_XvThYCSeBFIuWmDs_W27dgoWk1-2Y6dHnuewgpU5xO3yNhUvt_yTOvUgjJgCwIgd0CKdXkT1H-KP9LWSvsZGN9X5IxjA3he9od5yKsZySZyxDscLeRn7kQtS-4V_nsCDuaunv69Yv6CiQiSpOH3n8dclJMQdzG1C1AliN1xvQUyITvJNEVlXlORgNe_fZr0A2V-MfIxSHNbVRw_tAC2dUhW-IHWB03tkqL9CdRbU6C3R_caudMdC8heRcFVEXPbgpZcvw72Gi5ouK7jrNd2rLVt19XUvX-EhjKADdOXWLxvVI4aIeTgVmrvqes9BPK-Eb9_65Grj9LBZCX4qCDiOhInVrJMDEObDhntGR4U9l8wk3UvNIRKWT9ake7aRe9-ii8xhmLxr1FscYVyG2Gp4rORe13qvoq_1OCH5WwLWS23gby5XLrPFdL5rbMzZgmhslsbRrZPhOazdqcl2xiJAEa4Jt7QgQwLImxkFt8Y4IJpVMv4fkE0J8RJCK81yCYTy3h7RXdnT7l_ICbrrkR96udEGXnfdg2RXAG1PA3kUsNZpctvxwjkixsCcMYxX8GORRJbq1T-4sIcN60ztjkWCvc8b3o0AEiKw0PMdOJZL1RtGR6RUqBZ-tYwLxMoxOFo3qh_Uu5UHFgg01XRTVAO3-pPfLKywWqTKFOxwW6y8VXJubqGWMfqCRkPhWSSeIvX98DHzqEUYwupKIDyRwbTOQpNCUj5NwPsp5ZRYJWSprdyTEMP3_UPCdRlZNLOOFuUGZw96iwgVdbJyrDIfHVeVHQrNu7M8YifzYZMwfGVA";
+const video = document.getElementById("video");
+const shoot = document.getElementById("shoot");
+const previewBar = document.getElementById("previewBar");
 
 /* ======================
    STATE
@@ -325,6 +332,7 @@ function showError(msg){
 
 </body>
 </html>
+
 
 
 
