@@ -1,0 +1,22 @@
+{
+  "short_name": "PickApp",
+  "name": "PickApp Pro Magazzino",
+  "icons": [
+    {
+      "src": "https://evotechlab.github.io/pickapp/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://evotechlab.github.io/pickapp/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "index.html",
+  "background_color": "#121212",
+  "display": "standalone",
+  "scope": "./",
+  "theme_color": "#2196F3",
+  "description": "Sistema di gestione magazzino univoco con Dropbox e Cloudflare"
+}
