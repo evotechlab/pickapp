@@ -154,47 +154,43 @@
         }
 
         async function sendToDropbox(type) {
-            const statusIcon = document.getElementById('status-icon');
-            const qty = document.getElementById('qty-input').value;
-            const btnIn = document.getElementById('btn-in');
-            const btnOut = document.getElementById('btn-out');
+    const statusIcon = document.getElementById('status-icon');
+    const qty = document.getElementById('qty-input').value;
+    
+    statusIcon.innerText = "sync";
+    statusIcon.classList.add("rotating");
 
-            // Stato UI: Invio in corso
-            statusIcon.innerText = "sync";
-            statusIcon.classList.add("rotating");
-            btnIn.disabled = true;
-            btnOut.disabled = true;
+    const movement = {
+        barcode: lastCode,
+        quantity: qty,
+        type: type,
+        date: new Date().toLocaleString('it-IT')
+    };
 
-            const movement = {
-                barcode: lastCode,
-                quantity: qty,
-                type: type,
-                date: new Date().toLocaleString('it-IT')
-            };
+    try {
+        const response = await fetch(WORKER_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(movement)
+        });
 
-            try {
-                const response = await fetch(WORKER_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(movement)
-                });
+        const data = await response.json();
 
-                if (response.ok) {
-                    statusIcon.innerText = "cloud_done";
-                    closePanel();
-                } else {
-                    throw new Error("Errore Server");
-                }
-            } catch (err) {
-                statusIcon.innerText = "cloud_off";
-                alert("Errore durante il salvataggio su Dropbox");
-            } finally {
-                statusIcon.classList.remove("rotating");
-                btnIn.disabled = false;
-                btnOut.disabled = false;
-            }
+        if (response.ok) {
+            statusIcon.innerText = "cloud_done";
+            setTimeout(closePanel, 1000);
+        } else {
+            // Qui leggerai l'errore reale di Dropbox (es: token expired o path not found)
+            alert("ERRORE DROPBOX: " + JSON.stringify(data.error));
+            throw new Error("Errore Server");
         }
-
+    } catch (err) {
+        statusIcon.innerText = "cloud_off";
+        console.error(err);
+    } finally {
+        statusIcon.classList.remove("rotating");
+    }
+}        
         window.onload = initScanner;
     </script>
 </body>
