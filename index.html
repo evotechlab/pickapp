@@ -1,418 +1,205 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WMS - PickApp</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2196F3">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>PickApp v2 - Sincronizzato</title>
 
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/html5-qrcode"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode"></script>
 
-<style>
-body{
-    margin:0;
-    font-family: Inter, sans-serif;
-    background:#f1f5f9;
-    color:#0f172a;
-}
+    <style>
+        :root {
+            --primary: #2196F3;
+            --success: #4CAF50;
+            --danger: #F44336;
+            --dark: #222;
+        }
 
-header{
-    background:#0f172a;
-    color:white;
-    padding:16px;
-    text-align:center;
-    font-weight:600;
-    font-size:18px;
-}
+        body {
+            margin: 0; font-family: sans-serif;
+            background-color: #000; color: var(--dark);
+            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+        }
 
-.container{
-    padding:14px;
-}
+        /* App Bar */
+        .app-bar {
+            background: var(--primary); color: white;
+            padding: 15px 20px; display: flex;
+            justify-content: space-between; align-items: center;
+            z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
 
-.card{
-    background:white;
-    border-radius:14px;
-    padding:14px;
-    margin-bottom:14px;
-    box-shadow:0 4px 12px rgba(0,0,0,0.08);
-}
+        /* Scanner Area */
+        #scanner-container { flex: 1; position: relative; background: #000; }
+        #reader { width: 100% !important; height: 100% !important; }
 
-h3{
-    margin:0 0 10px 0;
-    font-size:16px;
-}
+        /* Overlay Mirino */
+        .scanner-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            pointer-events: none; z-index: 5;
+        }
+        .reticle {
+            width: 260px; height: 160px;
+            border: 2px solid rgba(255,255,255,0.4); border-radius: 15px;
+            position: relative;
+        }
+        .laser {
+            position: absolute; width: 100%; height: 2px;
+            background: red; box-shadow: 0 0 10px red;
+            top: 50%; animation: scan-anim 2s infinite ease-in-out;
+        }
+        @keyframes scan-anim { 0%, 100% { top: 10%; } 50% { top: 90%; } }
 
-input{
-    width:100%;
-    padding:14px;
-    border-radius:10px;
-    border:1px solid #cbd5e1;
-    font-size:16px;
-}
+        /* Product Panel */
+        #product-panel {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: white; border-radius: 25px 25px 0 0;
+            padding: 30px 25px; transform: translateY(110%);
+            transition: transform 0.4s ease; z-index: 150;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
+        }
+        #product-panel.active { transform: translateY(0); }
 
-#scanner{
-    width:100%;
-    min-height:200px;
-}
+        .qty-box { display: flex; justify-content: center; align-items: center; gap: 20px; margin: 25px 0; }
+        .qty-btn { width: 60px; height: 60px; border-radius: 50%; border: none; background: #f0f0f0; font-size: 24px; }
+        #qty-input { width: 90px; height: 60px; text-align: center; font-size: 28px; font-weight: bold; border: 1px solid #ddd; border-radius: 10px; }
 
-.status{
-    margin-top:8px;
-    font-size:15px;
-}
+        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .btn { height: 75px; border: none; border-radius: 15px; color: white; font-weight: bold; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .btn-in { background: var(--success); }
+        .btn-out { background: var(--danger); }
+        .btn:disabled { background: #ccc; opacity: 0.6; }
 
-button{
-    width:100%;
-    padding:18px;
-    border:none;
-    border-radius:14px;
-    font-size:20px;
-    font-weight:600;
-    margin-top:10px;
-    cursor:pointer;
-}
-
-.pick{
-    background:#16a34a;
-    color:white;
-}
-
-.pick:disabled{
-    background:#94a3b8;
-}
-
-.success{
-    background:#dcfce7;
-    color:#166534;
-    padding:10px;
-    border-radius:10px;
-    margin-top:10px;
-    text-align:center;
-    font-weight:600;
-}
-
-.error{
-    background:#fee2e2;
-    color:#991b1b;
-    padding:10px;
-    border-radius:10px;
-    margin-top:10px;
-    text-align:center;
-    font-weight:600;
-}
-
-table{
-    width:100%;
-    border-collapse:collapse;
-    font-size:14px;
-}
-
-td, th{
-    padding:8px;
-    border-bottom:1px solid #e2e8f0;
-    text-align:left;
-}
-
-th{
-    font-weight:600;
-}
-</style>
+        /* Sync Animation */
+        .rotating { animation: spin 1s infinite linear; }
+        @keyframes spin { from {transform: rotate(0deg);} to {transform: rotate(360deg);} }
+    </style>
 </head>
-
 <body>
 
-<header>WMS - Pick Scanner</header>
+    <header class="app-bar">
+        <h1>PickApp</h1>
+        <span class="material-icons" id="status-icon">cloud_done</span>
+    </header>
 
-<div class="container">
+    <main id="scanner-container">
+        <div id="reader"></div>
+        <div class="scanner-overlay" id="mirino">
+            <div class="reticle"><div class="laser"></div></div>
+        </div>
+    </main>
 
-<div class="card">
-<h3>Operatore</h3>
-<input type="text" id="operatore" placeholder="Inserisci nome operatore">
-</div>
+    <section id="product-panel">
+        <div style="text-align:center">
+            <h2 id="disp-name" style="margin:0; color:var(--primary)">Prodotto Rilevato</h2>
+            <p id="disp-barcode" style="color:#666; font-family:monospace; margin:5px 0">CODE: ---</p>
+        </div>
 
-<div class="card">
-<h3>Scanner Barcode</h3>
-<div id="scanner"></div>
-<div class="status">
-Codice: <b id="barcode">---</b>
-</div>
-<div id="feedback"></div>
-</div>
+        <div class="qty-box">
+            <button class="qty-btn" onclick="changeQty(-1)">-</button>
+            <input type="number" id="qty-input" value="1" inputmode="numeric">
+            <button class="qty-btn" onclick="changeQty(1)">+</button>
+        </div>
 
-<div class="card">
-<button id="pickBtn" class="pick" onclick="pickItem()">PICK</button>
-</div>
+        <div class="action-grid">
+            <button id="btn-out" class="btn btn-out" onclick="sendToDropbox('OUT')">
+                <span class="material-icons">remove_circle</span> SCARICO
+            </button>
+            <button id="btn-in" class="btn btn-in" onclick="sendToDropbox('IN')">
+                <span class="material-icons">add_circle</span> CARICO
+            </button>
+        </div>
+        <button onclick="closePanel()" style="width:100%; border:none; background:none; margin-top:20px; color:#999">ANNULLA</button>
+    </section>
 
-<div class="card">
-<h3>Movimenti Locali</h3>
-<table>
-<thead>
-<tr>
-<th>Ora</th>
-<th>Operatore</th>
-<th>Barcode</th>
-</tr>
-</thead>
-<tbody id="tableBody"></tbody>
-</table>
-</div>
+    <script>
+        // --- CONFIGURAZIONE ---
+        const WORKER_URL = "tyxghf.sviluppo-49a.workers.dev"; // <--- INSERISCI QUI L'URL DEL TUO WORKER
+        // ----------------------
 
-</div>
+        let html5QrCode;
+        let lastCode = "";
 
-<script>
-
-/* =========================
-   CONFIG
-========================= */
-
-const DROPBOX_APP_KEY = "k026s39y9cnq8y1";
-const DROPBOX_FOLDER = "/movimenti";
-const redirectUri = "https://evotechlab.github.io/pickapp/"; // ← METTI URL ESATTO MOBILE
-
-let accessToken = localStorage.getItem("db_access");
-let refreshToken = localStorage.getItem("db_refresh");
-
-/* =========================
-   PKCE HELPERS
-========================= */
-
-function generateRandomString(length) {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let result = "";
-    for (let i = 0; i < length; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-}
-
-async function sha256base64url(str) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(str);
-    const hash = await crypto.subtle.digest("SHA-256", data);
-    return btoa(String.fromCharCode(...new Uint8Array(hash)))
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
-}
-
-/* =========================
-   AUTH
-========================= */
-
-async function initDropboxAuth() {
-
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-
-    if (code && !accessToken) {
-
-        const codeVerifier = sessionStorage.getItem("pkce_code_verifier");
-
-        const response = await fetch("https://api.dropboxapi.com/oauth2/token", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-                code,
-                grant_type: "authorization_code",
-                client_id: DROPBOX_APP_KEY,
-                redirect_uri: redirectUri,
-                code_verifier: codeVerifier
-            })
-        });
-
-        if (!response.ok) {
-            localStorage.clear();
-            location.reload();
-            return;
+        function initScanner() {
+            html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 150 } },
+                onScanSuccess
+            ).catch(err => alert("Errore camera: " + err));
         }
 
-        const data = await response.json();
+        function onScanSuccess(code) {
+            if (code === lastCode) return;
+            lastCode = code;
+            if ("vibrate" in navigator) navigator.vibrate(100);
 
-        accessToken = data.access_token;
-        refreshToken = data.refresh_token;
-
-        localStorage.setItem("db_access", accessToken);
-        localStorage.setItem("db_refresh", refreshToken);
-
-        window.history.replaceState({}, document.title, redirectUri);
-    }
-
-    if (!accessToken && !refreshToken) {
-
-        const codeVerifier = generateRandomString(64);
-        const codeChallenge = await sha256base64url(codeVerifier);
-
-        sessionStorage.setItem("pkce_code_verifier", codeVerifier);
-
-        const authUrl =
-            `https://www.dropbox.com/oauth2/authorize` +
-            `?client_id=${DROPBOX_APP_KEY}` +
-            `&response_type=code` +
-            `&token_access_type=offline` +
-            `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-            `&code_challenge=${codeChallenge}` +
-            `&code_challenge_method=S256`;
-
-        window.location.href = authUrl;
-    }
-}
-
-/* =========================
-   REFRESH
-========================= */
-
-async function refreshAccessToken() {
-
-    const response = await fetch("https://api.dropboxapi.com/oauth2/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-            grant_type: "refresh_token",
-            refresh_token: refreshToken,
-            client_id: DROPBOX_APP_KEY
-        })
-    });
-
-    if (!response.ok) {
-        localStorage.clear();
-        location.reload();
-        return;
-    }
-
-    const data = await response.json();
-    accessToken = data.access_token;
-    localStorage.setItem("db_access", accessToken);
-}
-
-/* =========================
-   DROPBOX WRAPPER
-========================= */
-
-async function dropboxFetch(url, options = {}) {
-
-    options.headers = options.headers || {};
-    options.headers["Authorization"] = "Bearer " + accessToken;
-
-    let response = await fetch(url, options);
-
-    if (response.status === 401 && refreshToken) {
-        await refreshAccessToken();
-        options.headers["Authorization"] = "Bearer " + accessToken;
-        response = await fetch(url, options);
-    }
-
-    if (!response.ok) {
-        throw new Error("Dropbox API error");
-    }
-
-    return response;
-}
-
-/* =========================
-   SCANNER
-========================= */
-
-let currentCode = "";
-let movements = [];
-let uploading = false;
-
-const scanner = new Html5Qrcode("scanner");
-
-scanner.start(
-    { facingMode: "environment" },
-    { fps: 12, qrbox: { width: 350, height: 150 }, aspectRatio: 1.77 },
-    (decodedText) => {
-        currentCode = decodedText;
-        document.getElementById("barcode").innerText = decodedText;
-        navigator.vibrate?.(100);
-    }
-);
-
-/* =========================
-   UPLOAD
-========================= */
-
-async function uploadToDropbox(data) {
-
-    const filename = `${DROPBOX_FOLDER}/${Date.now()}_${crypto.randomUUID()}.json`;
-
-    await dropboxFetch(
-        "https://content.dropboxapi.com/2/files/upload",
-        {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/octet-stream",
-                "Dropbox-API-Arg": JSON.stringify({
-                    path: filename,
-                    mode: "add",
-                    autorename: true
-                })
-            },
-            body: JSON.stringify(data)
+            document.getElementById('disp-barcode').innerText = `CODE: ${code}`;
+            document.getElementById('product-panel').classList.add('active');
         }
-    );
-}
 
-/* =========================
-   PICK
-========================= */
+        function changeQty(v) {
+            let i = document.getElementById('qty-input');
+            let val = parseInt(i.value) + v;
+            if (val > 0) i.value = val;
+        }
 
-async function pickItem() {
+        function closePanel() {
+            document.getElementById('product-panel').classList.remove('active');
+            lastCode = "";
+        }
 
-    if (uploading) return;
+        async function sendToDropbox(type) {
+            const statusIcon = document.getElementById('status-icon');
+            const qty = document.getElementById('qty-input').value;
+            const btnIn = document.getElementById('btn-in');
+            const btnOut = document.getElementById('btn-out');
 
-    const operatore = document.getElementById("operatore").value.trim();
-    if (!operatore || !currentCode) return;
+            // Stato UI: Invio in corso
+            statusIcon.innerText = "sync";
+            statusIcon.classList.add("rotating");
+            btnIn.disabled = true;
+            btnOut.disabled = true;
 
-    uploading = true;
+            const movement = {
+                barcode: lastCode,
+                quantity: qty,
+                type: type,
+                date: new Date().toLocaleString('it-IT')
+            };
 
-    const movement = {
-        timestamp: new Date().toISOString(),
-        operatore,
-        barcode: currentCode,
-        azione: "pick",
-        device: "mobile"
-    };
+            try {
+                const response = await fetch(WORKER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(movement)
+                });
 
-    try {
-        await uploadToDropbox(movement);
-        showSuccess("Movimento inviato");
-        currentCode = "";
-        document.getElementById("barcode").innerText = "---";
-    } catch {
-        showError("Errore upload");
-    }
+                if (response.ok) {
+                    statusIcon.innerText = "cloud_done";
+                    closePanel();
+                } else {
+                    throw new Error("Errore Server");
+                }
+            } catch (err) {
+                statusIcon.innerText = "cloud_off";
+                alert("Errore durante il salvataggio su Dropbox");
+            } finally {
+                statusIcon.classList.remove("rotating");
+                btnIn.disabled = false;
+                btnOut.disabled = false;
+            }
+        }
 
-    uploading = false;
-}
-
-/* =========================
-   FEEDBACK
-========================= */
-
-function showSuccess(msg){
-    const fb = document.getElementById("feedback");
-    fb.innerHTML = `<div class="success">${msg}</div>`;
-    setTimeout(()=> fb.innerHTML = "", 2000);
-}
-
-function showError(msg){
-    const fb = document.getElementById("feedback");
-    fb.innerHTML = `<div class="error">${msg}</div>`;
-    setTimeout(()=> fb.innerHTML = "", 3000);
-}
-
-/* =========================
-   INIT
-========================= */
-
-initDropboxAuth();
-
-</script>
-
-
-
+        window.onload = initScanner;
+    </script>
 </body>
 </html>
+
 
 
 
