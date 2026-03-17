@@ -228,37 +228,47 @@
                 type: type,
                 timestamp: new Date().toISOString()
             };
-
+            
             try {
-                const response = await fetch(WORKER_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
+    const response = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
 
-                if (response.ok) {
-                    // Feedback Successo
-                    document.getElementById('success-msg').classList.add('show');
-                    statusIcon.innerText = "cloud_done";
-                    if ("vibrate" in navigator) navigator.vibrate([50, 30, 50]);
-                    
-                    setTimeout(() => {
-                        document.getElementById('success-msg').classList.remove('show');
-                        dismissSheet();
-                    }, 1200);
-                } else {
-                    throw new Error("Dropbox Error");
-                }
-            } catch (err) {
-                statusIcon.innerText = "cloud_off";
-                alert("Errore connessione. Riprova.");
-            } finally {
-                isProcessing = false;
-                statusIcon.classList.remove("spin");
-                btnIn.disabled = false;
-                btnOut.disabled = false;
-            }
-        }
+    const result = await response.json();
+
+    if (response.ok) {
+        // SUCCESSOTUTTO OK
+        document.getElementById('success-msg').style.background = "var(--success)";
+        document.getElementById('success-msg').innerHTML = '<span class="material-icons" style="font-size: 48px;">check_circle</span><p>REGISTRATO!</p>';
+        document.getElementById('success-msg').classList.add('show');
+        statusIcon.innerText = "cloud_done";
+        
+        setTimeout(() => {
+            document.getElementById('success-msg').classList.remove('show');
+            dismissSheet();
+        }, 1200);
+    } else {
+        // ERRORE DI LOGICA (Esempio: "Già fuori")
+        statusIcon.innerText = "report_problem";
+        document.getElementById('success-msg').style.background = "var(--danger)";
+        document.getElementById('success-msg').innerHTML = `<span class="material-icons" style="font-size: 48px;">error</span><p>${result.error}</p>`;
+        document.getElementById('success-msg').classList.add('show');
+        
+        if ("vibrate" in navigator) navigator.vibrate([100, 50, 100, 50, 100]); // Vibrazione di errore
+
+        setTimeout(() => {
+            document.getElementById('success-msg').classList.remove('show');
+            isProcessing = false; // Permettiamo all'utente di correggere o annullare
+            btnIn.disabled = false;
+            btnOut.disabled = false;
+        }, 3000);
+    }
+} catch (err) {
+    statusIcon.innerText = "cloud_off";
+    alert("Errore di rete. Controlla la connessione.");
+} 
 
         window.onload = startCamera;
     </script>
