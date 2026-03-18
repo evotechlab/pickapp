@@ -7,13 +7,14 @@
     <title>PickApp Pro</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="./manifest.json">
+    
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('sw.js')
-            .then(reg => console.log('SW registrato!', reg))
-            .catch(err => console.log('Errore SW', err));
+          navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('Service Worker registrato:', reg))
+            .catch(err => console.error('Errore Service Worker:', err));
         });
       }
     </script>
