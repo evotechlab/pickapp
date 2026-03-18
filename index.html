@@ -3,105 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>WMS Scanner Pro</title>
+    <title>PICKAPP PRO - Magazzino</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
-        body { -webkit-tap-highlight-color: transparent; background-color: #0f172a; color: white; overscroll-behavior-y: none; }
+        body { -webkit-tap-highlight-color: transparent; background-color: #f8fafc; color: #1e293b; overscroll-behavior-y: none; font-family: system-ui, -apple-system, sans-serif; }
         
-        /* Camera UI */
-        #reader { width: 100%; height: 100vh; object-fit: cover; position: fixed; top: 0; left: 0; z-index: 10; background: #000; }
-        #reader video { object-fit: cover !important; height: 100vh !important; }
-        
-        /* Overlay UI sopra la fotocamera */
-        .scanner-overlay { position: fixed; inset: 0; z-index: 20; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
-        .laser-box { width: 80%; max-width: 300px; height: 200px; border: 2px solid rgba(255,255,255,0.3); margin: auto; position: relative; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.85); }
+        /* Tema Colore Brand (Verde PickApp Pro context from image_1.png) */
+        .brand-bg { background-color: #10b981; } /* Emerald 500 */
+        .brand-text { color: #047857; } /* Emerald 700 */
+        .brand-border { border-color: #10b981; }
+
+        /* Camera UI Embedded */
+        #reader { width: 100%; border-radius: 12px; overflow: hidden; position: relative; aspect-ratio: 4/3; background: #000; border: 2px solid #e2e8f0; }
+        #reader video { object-fit: cover !important; }
+
+        /* Overlay di scansione semplificato */
+        #qr-shaded-region { border-color: rgba(248, 250, 252, 0.5) !important; }
+        .scanner-overlay { position: absolute; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; z-index: 5;}
+        .laser-box { width: 70%; max-width: 250px; height: 150px; border: 2px solid white; border-radius: 8px; position: relative; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); }
         .laser-line { width: 100%; height: 2px; background: #ef4444; position: absolute; top: 50%; box-shadow: 0 0 10px #ef4444; animation: scan 2s infinite linear; }
         @keyframes scan { 0% { top: 10%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 90%; opacity: 0; } }
 
-        /* Bottom Sheet (Modale Azioni) */
-        #actionSheet { position: fixed; bottom: 0; left: 0; width: 100%; background: white; color: #0f172a; z-index: 40; border-top-left-radius: 24px; border-top-right-radius: 24px; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 -10px 40px rgba(0,0,0,0.5); padding-bottom: env(safe-area-inset-bottom); }
-        #actionSheet.open { transform: translateY(0); }
+        /* Feedback di connessione */
+        .connection-status { width: 10px; height: 10px; border-radius: 50%; }
+        .status-online { background-color: #10b981; animation: pulse 1.5s infinite; }
+        .status-offline { background-color: #ef4444; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
 
-        /* Toast Notifiche */
-        #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px); color: white; padding: 12px 24px; border-radius: 50px; font-weight: bold; transition: all 0.4s ease; opacity: 0; z-index: 50; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); width: max-content;}
-        #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-        .toast-error { background: #ef4444; } .toast-success { background: #10b981; }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center min-h-screen">
+<body class="flex flex-col min-h-screen">
 
-    <div id="loginScreen" class="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center p-6 hidden">
-        <div class="bg-slate-800 p-8 rounded-3xl w-full max-w-sm border border-slate-700 shadow-2xl">
-            <div class="text-center mb-8">
-                <i class="fa-solid fa-user-shield text-5xl text-blue-500 mb-4"></i>
-                <h2 class="text-2xl font-bold text-white">Accesso Operatore</h2>
+    <div id="loginScreen" class="fixed inset-0 bg-slate-50 z-50 flex flex-col items-center justify-center p-6 hidden">
+        <div class="bg-white p-8 rounded-3xl w-full max-w-sm border border-slate-200 shadow-xl">
+            <div class="text-center mb-8 flex flex-col items-center gap-4">
+                <i class="fa-solid fa-shield-halved text-5xl text-emerald-600"></i> 
+                <h2 class="text-3xl font-black text-slate-900 tracking-tighter">PICKAPP <span class="text-emerald-600">PRO</span></h2>
             </div>
-            <input type="text" id="userInp" placeholder="ID Operatore" class="w-full bg-slate-900 text-white border border-slate-700 p-4 rounded-xl mb-4 outline-none focus:border-blue-500 transition font-mono">
-            <input type="password" id="passInp" placeholder="PIN" inputmode="numeric" class="w-full bg-slate-900 text-white border border-slate-700 p-4 rounded-xl mb-6 outline-none focus:border-blue-500 transition font-mono tracking-widest text-center">
-            <button onclick="verifyLogin()" id="loginBtn" class="w-full bg-blue-600 text-white font-bold p-4 rounded-xl hover:bg-blue-500 active:scale-95 transition">
+            <input type="text" id="userInp" placeholder="ID Operatore" class="w-full bg-slate-100 text-slate-900 border border-slate-200 p-4 rounded-xl mb-4 outline-none focus:border-emerald-500 transition font-mono">
+            <input type="password" id="passInp" placeholder="PIN" inputmode="numeric" class="w-full bg-slate-100 text-slate-900 border border-slate-200 p-4 rounded-xl mb-6 outline-none focus:border-emerald-500 transition font-mono tracking-widest text-center text-xl">
+            <button onclick="verifyLogin()" id="loginBtn" class="w-full brand-bg text-white font-bold p-4 rounded-xl hover:bg-emerald-600 active:scale-95 transition shadow-lg">
                 Sblocca Terminale
             </button>
         </div>
     </div>
 
-    <div id="authScreen" class="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center p-6 hidden">
-        <div class="bg-slate-800 p-8 rounded-3xl w-full max-w-sm border border-slate-700 text-center">
-            <i class="fa-brands fa-dropbox text-5xl text-blue-400 mb-4"></i>
-            <h2 class="text-2xl font-bold text-white mb-2">Sincronizzazione</h2>
-            <p class="text-slate-400 mb-6 text-sm">Connetti il terminale al magazzino centrale.</p>
-            <button onclick="loginDropbox()" id="dbBtn" class="w-full bg-blue-600 text-white font-bold p-4 rounded-xl active:scale-95 transition">
-                Connetti Server
+    <div id="authScreen" class="fixed inset-0 bg-slate-50 z-50 flex flex-col items-center justify-center p-6 hidden">
+        <div class="bg-white p-8 rounded-3xl w-full max-w-sm border border-slate-200 shadow-xl text-center">
+            <i class="fa-brands fa-dropbox text-5xl text-blue-500 mb-4"></i>
+            <h2 class="text-2xl font-bold text-slate-900 mb-2">Connessione Server</h2>
+            <p class="text-slate-500 mb-6 text-sm">Sincronizza il terminale con il magazzino centrale.</p>
+            <button onclick="loginDropbox()" id="dbBtn" class="w-full bg-blue-600 text-white font-bold p-4 rounded-xl active:scale-95 transition flex justify-center items-center gap-2">
+                <i class="fa-solid fa-link"></i> Autorizza Dropbox
             </button>
         </div>
     </div>
 
-    <div id="scannerScreen" class="hidden w-full h-full relative">
-        <div id="reader"></div>
+    <div id="scannerScreen" class="hidden flex flex-col flex-1 pb-[env(safe-area-inset-bottom)]">
         
-        <div class="scanner-overlay">
-            <div class="p-4 flex justify-between items-center bg-gradient-to-b from-slate-900/80 to-transparent">
-                <div class="flex items-center gap-2 text-emerald-400 font-bold tracking-wider">
-                    <div class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></div> SCANNER ATTIVO
+        <header class="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-shield-halved text-2xl text-emerald-600"></i> 
+                <div class="flex flex-col">
+                    <h1 class="text-lg font-black tracking-tight text-slate-950">PICKAPP <span class="text-emerald-600">PRO</span></h1>
+                    <div class="flex items-center gap-1.5 text-xs text-slate-500">
+                        <div id="connectionDot" class="connection-status status-offline"></div>
+                        <span id="connectionText">Offline</span>
+                    </div>
                 </div>
-                <button onclick="hardLogout()" class="text-white/70 hover:text-white p-2">
-                    <i class="fa-solid fa-power-off text-xl"></i>
-                </button>
             </div>
-            
-            <div class="laser-box pointer-events-auto" onclick="html5QrcodeScanner.resume()">
-                <div class="laser-line"></div>
-                <p class="absolute -bottom-8 w-full text-center text-white/50 text-sm font-bold tracking-widest">ALLINEA IL CODICE</p>
-            </div>
-            
-            <div class="p-6 bg-gradient-to-t from-slate-900 to-transparent h-24"></div>
-        </div>
-    </div>
-
-    <div id="actionSheet">
-        <div class="p-6">
-            <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
-            <p class="text-slate-500 text-sm font-bold uppercase tracking-wider mb-1 text-center">Oggetto Rilevato</p>
-            <h3 id="sheetBarcode" class="text-3xl font-black text-center text-slate-800 mb-8 font-mono tracking-tight">ABC-123</h3>
-            
-            <div class="grid grid-cols-2 gap-4">
-                <button onclick="processMovement('IN')" class="bg-emerald-100 text-emerald-700 border-2 border-emerald-500 font-bold py-5 rounded-2xl active:bg-emerald-200 active:scale-95 transition flex flex-col items-center gap-2">
-                    <i class="fa-solid fa-box-open text-3xl"></i>
-                    <span>STOCK (IN)</span>
-                </button>
-                <button onclick="processMovement('OUT')" class="bg-rose-100 text-rose-700 border-2 border-rose-500 font-bold py-5 rounded-2xl active:bg-rose-200 active:scale-95 transition flex flex-col items-center gap-2">
-                    <i class="fa-solid fa-dolly text-3xl"></i>
-                    <span>PICK (OUT)</span>
-                </button>
-            </div>
-            <button onclick="closeSheet()" class="w-full mt-4 text-slate-400 font-bold p-4 rounded-xl active:bg-slate-100 transition">
-                ANNULLA
+            <button onclick="hardLogout()" class="text-slate-400 hover:text-rose-600 p-2 rounded-lg hover:bg-rose-50 transition" title="Disconnetti">
+                <i class="fa-solid fa-power-off text-lg"></i>
             </button>
-        </div>
-    </div>
+        </header>
 
-    <div id="toast"><i id="toastIcon" class="fa-solid"></i> <span id="toastMsg"></span></div>
+        <main class="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
+            
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Ultimo Scansionato</p>
+                    <h3 id="infoBarcode" class="text-2xl font-black text-slate-900 font-mono tracking-tighter truncate">-</h3>
+                </div>
+                <div id="statusCard" class="bg-slate-100 p-4 rounded-2xl shadow-sm border border-slate-200 transition-colors">
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Stato Sistema</p>
+                    <div class="flex items-center gap-2">
+                        <i id="statusIcon" class="fa-solid fa-circle-question text-lg text-slate-400"></i>
+                        <span id="statusMessage" class="font-bold text-slate-600 truncate">Attendere scansione...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="relative flex-1 min-h-[300px]">
+                <div id="reader"></div>
+                <div class="scanner-overlay pointer-events-none">
+                    <div class="laser-box">
+                        <div class="laser-line"></div>
+                        <div class="absolute -bottom-10 left-0 w-full text-center">
+                            <span class="text-xs brand-text font-bold uppercase tracking-widest bg-emerald-100 px-3 py-1 rounded-full border brand-border">INQUADRA IL CODICE</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="h-20"></div>
+        </main>
+
+        <footer class="sticky bottom-0 z-30 bg-white border-t border-slate-200 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] p-4 flex gap-4 disabled:opacity-50">
+            <button onclick="processMovement('IN')" id="stockBtn" disabled class="flex-1 bg-emerald-50 text-emerald-700 border-2 border-emerald-500 font-bold py-5 rounded-2xl active:bg-emerald-100 active:scale-95 transition-all flex flex-col items-center gap-2 shadow-sm disabled:border-slate-300 disabled:text-slate-400 disabled:bg-slate-50">
+                <i class="fa-solid fa-box-open text-3xl"></i>
+                <span class="text-lg">STOCK (IN)</span>
+            </button>
+            <button onclick="processMovement('OUT')" id="pickBtn" disabled class="flex-1 bg-rose-50 text-rose-700 border-2 border-rose-500 font-bold py-5 rounded-2xl active:bg-rose-100 active:scale-95 transition-all flex flex-col items-center gap-2 shadow-sm disabled:border-slate-300 disabled:text-slate-400 disabled:bg-slate-50">
+                <i class="fa-solid fa-dolly text-3xl"></i>
+                <span class="text-lg">PICK (OUT)</span>
+            </button>
+        </footer>
+    </div>
 
     <script>
         // ================= CONFIGURAZIONE =================
@@ -125,6 +144,7 @@
                 showScreen('authScreen');
             } else {
                 showScreen('scannerScreen');
+                updateConnectionStatus(true);
                 initCamera();
             }
         }
@@ -132,6 +152,41 @@
         function showScreen(id) {
             ['loginScreen', 'authScreen', 'scannerScreen'].forEach(s => document.getElementById(s).classList.add('hidden'));
             document.getElementById(id).classList.remove('hidden');
+        }
+
+        function updateConnectionStatus(isOnline) {
+            const dot = document.getElementById('connectionDot');
+            const text = document.getElementById('connectionText');
+            if(isOnline) {
+                dot.className = 'connection-status status-online'; text.innerText = 'Connesso'; text.className = 'brand-text';
+            } else {
+                dot.className = 'connection-status status-offline'; text.innerText = 'Offline'; text.className = 'text-slate-500';
+            }
+        }
+
+        function setSystemFeedback(msg, type = "default") {
+            const card = document.getElementById('statusCard');
+            const icon = document.getElementById('statusIcon');
+            const message = document.getElementById('statusMessage');
+            message.innerText = msg;
+
+            if(type === "success") {
+                card.className = "bg-emerald-50 p-4 rounded-2xl shadow-sm border border-emerald-300 transition-colors";
+                icon.className = "fa-solid fa-check-circle text-lg text-emerald-500";
+                message.className = "font-bold text-emerald-800 truncate";
+            } else if(type === "error") {
+                card.className = "bg-rose-50 p-4 rounded-2xl shadow-sm border border-rose-300 transition-colors";
+                icon.className = "fa-solid fa-triangle-exclamation text-lg text-rose-500";
+                message.className = "font-bold text-rose-800 truncate";
+            } else if(type === "loading") {
+                card.className = "bg-blue-50 p-4 rounded-2xl shadow-sm border border-blue-200 transition-colors animate-pulse";
+                icon.className = "fa-solid fa-circle-notch fa-spin text-lg text-blue-500";
+                message.className = "font-bold text-blue-700 truncate";
+            } else {
+                card.className = "bg-slate-100 p-4 rounded-2xl shadow-sm border border-slate-200 transition-colors";
+                icon.className = "fa-solid fa-circle-question text-lg text-slate-400";
+                message.className = "font-bold text-slate-600 truncate";
+            }
         }
 
         // ================= 1. LOGIN AZIENDALE =================
@@ -153,10 +208,11 @@
                     isUnlocked = true; localStorage.setItem("wms_unlocked", "true");
                     checkAppStatus();
                 } else {
-                    showToast("Credenziali Errate", "error");
+                    setSystemFeedback("Credenziali Errate", "error");
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                 }
             } catch (e) {
-                showToast("Errore di rete", "error");
+                setSystemFeedback("Errore server (Azienda)", "error");
             } finally {
                 btn.innerHTML = 'Sblocca Terminale'; btn.disabled = false;
             }
@@ -165,13 +221,14 @@
         // ================= 2. OAUTH DROPBOX =================
         async function loginDropbox() {
             const btn = document.getElementById('dbBtn');
-            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Attendere...';
             try {
                 const res = await fetch(WORKER_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "getAuthUrl" }) });
                 const data = await res.json();
                 if (data.success && data.url) window.location.href = data.url;
             } catch (e) {
-                showToast("Errore server", "error"); btn.innerHTML = 'Connetti Server';
+                updateConnectionStatus(false);
+                setSystemFeedback("Server irraggiungibile (Dropbox)", "error"); btn.innerHTML = '<i class="fa-solid fa-link"></i> Autorizza Dropbox';
             }
         }
 
@@ -187,80 +244,86 @@
             }
         }
 
-        // ================= 3. FOTOCAMERA E SCANNER =================
+        // ================= 3. FOTOCAMERA E SCANNER EMBEDDED =================
         function initCamera() {
-            if (html5QrcodeScanner) return; // Evita doppie inizializzazioni
+            if (html5QrcodeScanner) return; 
             
             html5QrcodeScanner = new Html5Qrcode("reader");
-            const config = { fps: 15, qrbox: { width: 250, height: 150 }, aspectRatio: 1.0 };
+            const config = { fps: 15, qrbox: { width: 250, height: 150 }, aspectRatio: 4/3 };
 
             html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
                 .catch(err => {
-                    showToast("Errore avvio fotocamera", "error");
+                    setSystemFeedback("Errore fotocamera. Controlla permessi.", "error");
                 });
         }
 
         function onScanSuccess(decodedText) {
-            if(document.getElementById('actionSheet').classList.contains('open')) return; // Ignora se modale aperto
-            
-            // Feedback di lettura
-            if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-            
-            // Pausa scanner e apri Bottom Sheet
-            html5QrcodeScanner.pause();
+            // Seleziona l'oggetto e aggiorna la UI
             currentBarcode = decodedText;
-            document.getElementById('sheetBarcode').innerText = currentBarcode;
-            document.getElementById('actionSheet').classList.add('open');
-        }
+            document.getElementById('infoBarcode').innerText = currentBarcode;
+            
+            // Abilita pulsanti e mostra feedback provvisorio
+            document.getElementById('stockBtn').disabled = false;
+            document.getElementById('pickBtn').disabled = false;
+            setSystemFeedback("Scegli operazione...", "default");
 
-        function closeSheet() {
-            document.getElementById('actionSheet').classList.remove('open');
-            setTimeout(() => { if(html5QrcodeScanner) html5QrcodeScanner.resume(); }, 300);
+            // Feedback aptico Amazon Style (Scansione veloce)
+            if (navigator.vibrate) navigator.vibrate(50);
         }
 
         // ================= 4. PROCESSO MOVIMENTO =================
         async function processMovement(type) {
+            const barcode = currentBarcode;
             const btnText = type === 'IN' ? 'STOCK' : 'PICK';
-            document.getElementById('actionSheet').classList.remove('open');
+            
+            // Disabilita pulsanti e mostra caricamento
+            document.getElementById('stockBtn').disabled = true;
+            document.getElementById('pickBtn').disabled = true;
+            setSystemFeedback(`${btnText} in corso...`, "loading");
             
             try {
                 const res = await fetch(WORKER_URL, {
                     method: "POST",
                     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
-                    body: JSON.stringify({ action: "processMovement", barcode: currentBarcode, type: type })
+                    body: JSON.stringify({ action: "processMovement", barcode: barcode, type: type })
                 });
 
                 const data = await res.json();
 
                 if (res.status === 401 || (data.error && data.error.includes("expired"))) {
+                    updateConnectionStatus(false);
                     hardLogout(); return;
                 }
 
                 if (data.success) {
                     if (navigator.vibrate) navigator.vibrate(100);
-                    showToast(`${currentBarcode} -> ${btnText} OK!`, "success");
+                    setSystemFeedback(`${barcode} registrato (${btnText})`, "success");
+                    resetScannerUI();
                 } else {
                     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                    showToast(data.error, "error");
+                    setSystemFeedback(data.error || "Operazione fallita.", "error");
+                    // Lascia i pulsanti disabilitati per forzare nuova scansione se errore di logica (es già IN)
+                    setTimeout(resetScannerUI, 3000); 
                 }
             } catch (e) {
-                showToast("Errore di rete", "error");
-            } finally {
-                setTimeout(() => { if(html5QrcodeScanner) html5QrcodeScanner.resume(); }, 1500); // Riprendi scansione dopo 1.5s
+                setSystemFeedback("Errore di rete. Controlla connessione.", "error");
+                document.getElementById('stockBtn').disabled = false; // Permetti riprova
+                document.getElementById('pickBtn').disabled = false;
             }
         }
 
         // ================= UTILITY =================
-        function showToast(msg, type) {
-            const t = document.getElementById('toast');
-            document.getElementById('toastMsg').innerText = msg;
-            document.getElementById('toastIcon').className = type === 'success' ? 'fa-solid fa-check-circle' : 'fa-solid fa-triangle-exclamation';
-            t.className = type === 'success' ? 'toast-success show' : 'toast-error show';
-            setTimeout(() => t.classList.remove('show'), 3000);
+        function resetScannerUI() {
+            currentBarcode = null;
+            document.getElementById('infoBarcode').innerText = "-";
+            document.getElementById('stockBtn').disabled = true;
+            document.getElementById('pickBtn').disabled = true;
+            // setSystemFeedback("Attendere scansione...", "default");
         }
 
         function hardLogout() {
             localStorage.clear();
+            if (html5QrcodeScanner) html5QrcodeScanner.stop();
             window.location.reload();
         }
     </script>
