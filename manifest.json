@@ -1,15 +1,15 @@
 {
-  "name": "PickApp Pro",
+  "name": "PickApp Pro Magazzino",
   "short_name": "PickApp",
-  "start_url": "/pickapp/index.html",
-  "scope": "/pickapp/",
+  "start_url": "./index.html",
   "display": "fullscreen",
   "background_color": "#121212",
   "theme_color": "#2196F3",
   "description": "Sistema professionale di gestione carico/scarico magazzino.",
+  "orientation": "portrait",
   "icons": [
     {
-      "src": "./icon-512.png",
+      "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
