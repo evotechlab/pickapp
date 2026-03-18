@@ -2,202 +2,266 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Scanner Magazzino</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>WMS Scanner Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
-        body { -webkit-tap-highlight-color: transparent; }
-        /* Toast Notification */
-        #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); color: white; padding: 12px 24px; border-radius: 50px; font-weight: bold; transition: all 0.3s ease; opacity: 0; z-index: 50; }
+        body { -webkit-tap-highlight-color: transparent; background-color: #0f172a; color: white; overscroll-behavior-y: none; }
+        
+        /* Camera UI */
+        #reader { width: 100%; height: 100vh; object-fit: cover; position: fixed; top: 0; left: 0; z-index: 10; background: #000; }
+        #reader video { object-fit: cover !important; height: 100vh !important; }
+        
+        /* Overlay UI sopra la fotocamera */
+        .scanner-overlay { position: fixed; inset: 0; z-index: 20; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
+        .laser-box { width: 80%; max-width: 300px; height: 200px; border: 2px solid rgba(255,255,255,0.3); margin: auto; position: relative; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.85); }
+        .laser-line { width: 100%; height: 2px; background: #ef4444; position: absolute; top: 50%; box-shadow: 0 0 10px #ef4444; animation: scan 2s infinite linear; }
+        @keyframes scan { 0% { top: 10%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 90%; opacity: 0; } }
+
+        /* Bottom Sheet (Modale Azioni) */
+        #actionSheet { position: fixed; bottom: 0; left: 0; width: 100%; background: white; color: #0f172a; z-index: 40; border-top-left-radius: 24px; border-top-right-radius: 24px; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 -10px 40px rgba(0,0,0,0.5); padding-bottom: env(safe-area-inset-bottom); }
+        #actionSheet.open { transform: translateY(0); }
+
+        /* Toast Notifiche */
+        #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px); color: white; padding: 12px 24px; border-radius: 50px; font-weight: bold; transition: all 0.4s ease; opacity: 0; z-index: 50; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); width: max-content;}
         #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-        #toast.error { background-color: #ef4444; }
-        #toast.success { background-color: #10b981; }
+        .toast-error { background: #ef4444; } .toast-success { background: #10b981; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col text-gray-800">
+<body class="flex flex-col items-center justify-center min-h-screen">
 
-    <header class="bg-slate-800 text-white p-4 flex justify-between items-center shadow-md">
-        <div class="flex items-center gap-2">
-            <i class="fa-solid fa-barcode text-xl"></i>
-            <h1 class="text-lg font-bold">WMS Scanner</h1>
-        </div>
-        <button onclick="logout()" class="text-slate-300 hover:text-white" title="Disconnetti">
-            <i class="fa-solid fa-right-from-bracket"></i>
-        </button>
-    </header>
-
-    <div id="toast">Messaggio</div>
-
-    <div id="loginScreen" class="flex-1 flex flex-col items-center justify-center p-6 hidden">
-        <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-sm text-center">
-            <i class="fa-brands fa-dropbox text-5xl text-blue-600 mb-4"></i>
-            <h2 class="text-2xl font-bold mb-2">Connetti Server</h2>
-            <p class="text-gray-500 mb-6 text-sm">Accedi per abilitare lo scanner.</p>
-            <button onclick="loginDropbox()" id="loginBtn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 active:scale-95 transition flex justify-center items-center gap-2">
-                <i class="fa-solid fa-link"></i> Autorizza Dropbox
+    <div id="loginScreen" class="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center p-6 hidden">
+        <div class="bg-slate-800 p-8 rounded-3xl w-full max-w-sm border border-slate-700 shadow-2xl">
+            <div class="text-center mb-8">
+                <i class="fa-solid fa-user-shield text-5xl text-blue-500 mb-4"></i>
+                <h2 class="text-2xl font-bold text-white">Accesso Operatore</h2>
+            </div>
+            <input type="text" id="userInp" placeholder="ID Operatore" class="w-full bg-slate-900 text-white border border-slate-700 p-4 rounded-xl mb-4 outline-none focus:border-blue-500 transition font-mono">
+            <input type="password" id="passInp" placeholder="PIN" inputmode="numeric" class="w-full bg-slate-900 text-white border border-slate-700 p-4 rounded-xl mb-6 outline-none focus:border-blue-500 transition font-mono tracking-widest text-center">
+            <button onclick="verifyLogin()" id="loginBtn" class="w-full bg-blue-600 text-white font-bold p-4 rounded-xl hover:bg-blue-500 active:scale-95 transition">
+                Sblocca Terminale
             </button>
         </div>
     </div>
 
-    <div id="appScreen" class="flex-1 flex flex-col items-center justify-center p-4 hidden">
-        <div class="bg-white p-6 rounded-2xl shadow-lg w-full max-w-sm">
-            
-            <div class="text-center mb-6">
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Codice a Barre</p>
-                <input type="text" id="barcodeInput" placeholder="Scansiona o digita..." class="w-full text-center text-3xl font-bold p-4 bg-gray-50 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-0 outline-none uppercase transition">
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <button onclick="processMovement('IN')" class="bg-emerald-500 text-white font-bold py-6 rounded-xl hover:bg-emerald-600 active:scale-95 transition shadow-md flex flex-col items-center justify-center gap-2">
-                    <i class="fa-solid fa-box-open text-2xl"></i>
-                    <span class="text-lg">STOCK (IN)</span>
-                </button>
-                <button onclick="processMovement('OUT')" class="bg-rose-500 text-white font-bold py-6 rounded-xl hover:bg-rose-600 active:scale-95 transition shadow-md flex flex-col items-center justify-center gap-2">
-                    <i class="fa-solid fa-dolly text-2xl"></i>
-                    <span class="text-lg">PICK (OUT)</span>
-                </button>
-            </div>
-
-            <div id="loader" class="hidden mt-6 text-center text-blue-600 font-bold animate-pulse">
-                <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Elaborazione in corso...
-            </div>
-
+    <div id="authScreen" class="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center p-6 hidden">
+        <div class="bg-slate-800 p-8 rounded-3xl w-full max-w-sm border border-slate-700 text-center">
+            <i class="fa-brands fa-dropbox text-5xl text-blue-400 mb-4"></i>
+            <h2 class="text-2xl font-bold text-white mb-2">Sincronizzazione</h2>
+            <p class="text-slate-400 mb-6 text-sm">Connetti il terminale al magazzino centrale.</p>
+            <button onclick="loginDropbox()" id="dbBtn" class="w-full bg-blue-600 text-white font-bold p-4 rounded-xl active:scale-95 transition">
+                Connetti Server
+            </button>
         </div>
     </div>
 
+    <div id="scannerScreen" class="hidden w-full h-full relative">
+        <div id="reader"></div>
+        
+        <div class="scanner-overlay">
+            <div class="p-4 flex justify-between items-center bg-gradient-to-b from-slate-900/80 to-transparent">
+                <div class="flex items-center gap-2 text-emerald-400 font-bold tracking-wider">
+                    <div class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></div> SCANNER ATTIVO
+                </div>
+                <button onclick="hardLogout()" class="text-white/70 hover:text-white p-2">
+                    <i class="fa-solid fa-power-off text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="laser-box pointer-events-auto" onclick="html5QrcodeScanner.resume()">
+                <div class="laser-line"></div>
+                <p class="absolute -bottom-8 w-full text-center text-white/50 text-sm font-bold tracking-widest">ALLINEA IL CODICE</p>
+            </div>
+            
+            <div class="p-6 bg-gradient-to-t from-slate-900 to-transparent h-24"></div>
+        </div>
+    </div>
+
+    <div id="actionSheet">
+        <div class="p-6">
+            <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
+            <p class="text-slate-500 text-sm font-bold uppercase tracking-wider mb-1 text-center">Oggetto Rilevato</p>
+            <h3 id="sheetBarcode" class="text-3xl font-black text-center text-slate-800 mb-8 font-mono tracking-tight">ABC-123</h3>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="processMovement('IN')" class="bg-emerald-100 text-emerald-700 border-2 border-emerald-500 font-bold py-5 rounded-2xl active:bg-emerald-200 active:scale-95 transition flex flex-col items-center gap-2">
+                    <i class="fa-solid fa-box-open text-3xl"></i>
+                    <span>STOCK (IN)</span>
+                </button>
+                <button onclick="processMovement('OUT')" class="bg-rose-100 text-rose-700 border-2 border-rose-500 font-bold py-5 rounded-2xl active:bg-rose-200 active:scale-95 transition flex flex-col items-center gap-2">
+                    <i class="fa-solid fa-dolly text-3xl"></i>
+                    <span>PICK (OUT)</span>
+                </button>
+            </div>
+            <button onclick="closeSheet()" class="w-full mt-4 text-slate-400 font-bold p-4 rounded-xl active:bg-slate-100 transition">
+                ANNULLA
+            </button>
+        </div>
+    </div>
+
+    <div id="toast"><i id="toastIcon" class="fa-solid"></i> <span id="toastMsg"></span></div>
+
     <script>
-        // ==========================================
-        // CONFIGURAZIONE: INSERISCI QUI IL TUO WORKER
-        // ==========================================
-        const WORKER_URL = "https://tyxghf.sviluppo-49a.workers.dev/";
+        // ================= CONFIGURAZIONE =================
+        const WORKER_URL = "https://tyxghf.sviluppo-49a.workers.dev"; 
+        
+        let isUnlocked = localStorage.getItem("wms_unlocked") === "true";
+        let accessToken = localStorage.getItem("wms_db_token");
+        let html5QrcodeScanner = null;
+        let currentBarcode = null;
 
-        let accessToken = localStorage.getItem("wms_access_token");
-
-        // Inizializzazione
         document.addEventListener('DOMContentLoaded', () => {
             handleRedirect();
-            checkAuth();
+            checkAppStatus();
         });
 
-        // Mostra schermata corretta in base al token
-        function checkAuth() {
-            if (accessToken) {
-                document.getElementById('loginScreen').classList.add('hidden');
-                document.getElementById('appScreen').classList.remove('hidden');
-                document.getElementById('appScreen').classList.add('flex');
-                document.getElementById('barcodeInput').focus(); // Auto-focus per lo scanner laser
+        // ================= ROUTING & STATO =================
+        function checkAppStatus() {
+            if (!isUnlocked) {
+                showScreen('loginScreen');
+            } else if (!accessToken) {
+                showScreen('authScreen');
             } else {
-                document.getElementById('loginScreen').classList.remove('hidden');
-                document.getElementById('appScreen').classList.add('hidden');
-                document.getElementById('appScreen').classList.remove('flex');
+                showScreen('scannerScreen');
+                initCamera();
             }
         }
 
-        // Chiede al Worker l'URL di Dropbox e reindirizza
-        async function loginDropbox() {
+        function showScreen(id) {
+            ['loginScreen', 'authScreen', 'scannerScreen'].forEach(s => document.getElementById(s).classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        // ================= 1. LOGIN AZIENDALE =================
+        async function verifyLogin() {
+            const user = document.getElementById('userInp').value.trim();
+            const pass = document.getElementById('passInp').value.trim();
             const btn = document.getElementById('loginBtn');
-            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Attendere...';
-            btn.disabled = true;
+            if(!user || !pass) return;
+
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>'; btn.disabled = true;
 
             try {
                 const res = await fetch(WORKER_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "getAuthUrl" })
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "verifyLogin", user: user, pass: pass })
                 });
                 const data = await res.json();
-                if (data.success && data.url) {
-                    window.location.href = data.url;
+                if (data.success) {
+                    isUnlocked = true; localStorage.setItem("wms_unlocked", "true");
+                    checkAppStatus();
                 } else {
-                    showToast("Errore di configurazione del server", "error");
-                    btn.innerHTML = '<i class="fa-solid fa-link"></i> Autorizza Dropbox';
-                    btn.disabled = false;
+                    showToast("Credenziali Errate", "error");
                 }
             } catch (e) {
-                showToast("Server irraggiungibile", "error");
-                btn.innerHTML = '<i class="fa-solid fa-link"></i> Autorizza Dropbox';
-                btn.disabled = false;
+                showToast("Errore di rete", "error");
+            } finally {
+                btn.innerHTML = 'Sblocca Terminale'; btn.disabled = false;
             }
         }
 
-        // Estrae il token dall'URL dopo il rientro da Dropbox
+        // ================= 2. OAUTH DROPBOX =================
+        async function loginDropbox() {
+            const btn = document.getElementById('dbBtn');
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+            try {
+                const res = await fetch(WORKER_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "getAuthUrl" }) });
+                const data = await res.json();
+                if (data.success && data.url) window.location.href = data.url;
+            } catch (e) {
+                showToast("Errore server", "error"); btn.innerHTML = 'Connetti Server';
+            }
+        }
+
         function handleRedirect() {
             const hash = window.location.hash;
             if (hash && hash.includes("access_token")) {
                 const params = new URLSearchParams(hash.substring(1));
                 const token = params.get("access_token");
                 if (token) {
-                    accessToken = token;
-                    localStorage.setItem("wms_access_token", accessToken);
+                    accessToken = token; localStorage.setItem("wms_db_token", accessToken);
                     window.history.replaceState({}, document.title, window.location.pathname);
                 }
             }
         }
 
-        // Elabora l'operazione IN o OUT
+        // ================= 3. FOTOCAMERA E SCANNER =================
+        function initCamera() {
+            if (html5QrcodeScanner) return; // Evita doppie inizializzazioni
+            
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            const config = { fps: 15, qrbox: { width: 250, height: 150 }, aspectRatio: 1.0 };
+
+            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
+                .catch(err => {
+                    showToast("Errore avvio fotocamera", "error");
+                });
+        }
+
+        function onScanSuccess(decodedText) {
+            if(document.getElementById('actionSheet').classList.contains('open')) return; // Ignora se modale aperto
+            
+            // Feedback di lettura
+            if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+            
+            // Pausa scanner e apri Bottom Sheet
+            html5QrcodeScanner.pause();
+            currentBarcode = decodedText;
+            document.getElementById('sheetBarcode').innerText = currentBarcode;
+            document.getElementById('actionSheet').classList.add('open');
+        }
+
+        function closeSheet() {
+            document.getElementById('actionSheet').classList.remove('open');
+            setTimeout(() => { if(html5QrcodeScanner) html5QrcodeScanner.resume(); }, 300);
+        }
+
+        // ================= 4. PROCESSO MOVIMENTO =================
         async function processMovement(type) {
-            const barcodeInput = document.getElementById('barcodeInput');
-            const barcode = barcodeInput.value.trim().toUpperCase();
-
-            if (!barcode) {
-                showToast("Inserisci o scansiona un codice!", "error");
-                barcodeInput.focus();
-                return;
-            }
-
-            document.getElementById('loader').classList.remove('hidden');
+            const btnText = type === 'IN' ? 'STOCK' : 'PICK';
+            document.getElementById('actionSheet').classList.remove('open');
             
             try {
                 const res = await fetch(WORKER_URL, {
                     method: "POST",
-                    headers: { 
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${accessToken}`
-                    },
-                    body: JSON.stringify({
-                        action: "processMovement",
-                        barcode: barcode,
-                        type: type
-                    })
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
+                    body: JSON.stringify({ action: "processMovement", barcode: currentBarcode, type: type })
                 });
 
                 const data = await res.json();
 
                 if (res.status === 401 || (data.error && data.error.includes("expired"))) {
-                    logout("Sessione scaduta, esegui nuovo accesso.");
-                    return;
+                    hardLogout(); return;
                 }
 
                 if (data.success) {
-                    showToast(`${barcode} registrato come ${type} con successo!`, "success");
-                    barcodeInput.value = ""; // Svuota il campo per il prossimo oggetto
-                    barcodeInput.focus();
+                    if (navigator.vibrate) navigator.vibrate(100);
+                    showToast(`${currentBarcode} -> ${btnText} OK!`, "success");
                 } else {
-                    showToast(data.error || "Errore sconosciuto", "error");
-                    barcodeInput.focus();
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                    showToast(data.error, "error");
                 }
-
             } catch (e) {
-                showToast("Errore di rete. Riprova.", "error");
+                showToast("Errore di rete", "error");
             } finally {
-                document.getElementById('loader').classList.add('hidden');
+                setTimeout(() => { if(html5QrcodeScanner) html5QrcodeScanner.resume(); }, 1500); // Riprendi scansione dopo 1.5s
             }
         }
 
-        function showToast(msg, type = "success") {
-            const toast = document.getElementById('toast');
-            toast.textContent = msg;
-            toast.className = type;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3500);
+        // ================= UTILITY =================
+        function showToast(msg, type) {
+            const t = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            document.getElementById('toastIcon').className = type === 'success' ? 'fa-solid fa-check-circle' : 'fa-solid fa-triangle-exclamation';
+            t.className = type === 'success' ? 'toast-success show' : 'toast-error show';
+            setTimeout(() => t.classList.remove('show'), 3000);
         }
 
-        function logout(msg = null) {
-            localStorage.removeItem("wms_access_token");
-            accessToken = null;
-            checkAuth();
-            if(msg) alert(msg);
+        function hardLogout() {
+            localStorage.clear();
+            window.location.reload();
         }
     </script>
 </body>
