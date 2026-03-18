@@ -1,9 +1,9 @@
 const CACHE_NAME = 'pickapp-v5'; // Incrementato versione
 const ASSETS = [
-  '/pickapp/',
   '/pickapp/index.html',
   '/pickapp/manifest.json',
-  '/pickapp/icon-512.png'
+  '/pickapp/icon-512.png',
+  '/pickapp/'
 ];
 
 // Installazione
