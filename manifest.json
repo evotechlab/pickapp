@@ -1,25 +1,18 @@
 {
-  "name": "PickApp",
+  "name": "PickApp Pro",
   "short_name": "PickApp",
-  "start_url": "index.html",
-  "scope": "./",
+  "start_url": "/pickapp/index.html",
+  "scope": "/pickapp/",
   "display": "fullscreen",
   "background_color": "#121212",
   "theme_color": "#2196F3",
-  "description": "Sistema professionale di gestione carico/scarico magazzino univoco.",
-  "orientation": "portrait",
+  "description": "Sistema professionale di gestione carico/scarico magazzino.",
   "icons": [
     {
-      "src": "icon-512.png",
+      "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ]
 }
