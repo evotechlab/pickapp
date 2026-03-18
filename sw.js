@@ -1,4 +1,4 @@
-// Service Worker passivo (Modello FieldCam)
+// Service Worker passivo per validazione PWA
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
