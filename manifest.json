@@ -1,8 +1,8 @@
 {
   "name": "PickApp",
   "short_name": "PickApp",
-  "start_url": "/pickapp/index.html",
-  "scope": "/pickapp/",
+  "start_url": "index.html",
+  "scope": "./",
   "display": "fullscreen",
   "background_color": "#121212",
   "theme_color": "#2196F3",
@@ -10,10 +10,16 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "./icon-512.png",
+      "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
