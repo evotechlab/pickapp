@@ -10,10 +10,10 @@
     <style>
         body { -webkit-tap-highlight-color: transparent; background-color: #f8fafc; color: #1e293b; overscroll-behavior-y: none; font-family: system-ui, -apple-system, sans-serif; }
         
-        /* Tema Colore Brand (Verde PickApp Pro context from image_1.png) */
-        .brand-bg { background-color: #10b981; } /* Emerald 500 */
-        .brand-text { color: #047857; } /* Emerald 700 */
-        .brand-border { border-color: #10b981; }
+        /* Tema Colore Brand (Blu context image_0.png) */
+        .brand-bg-blue { background-color: #3b82f6; } /* Blue 500 */
+        .brand-text-blue { color: #1d4ed8; } /* Blue 700 */
+        .brand-border-blue { border-color: #3b82f6; }
 
         /* Camera UI Embedded */
         #reader { width: 100%; border-radius: 12px; overflow: hidden; position: relative; aspect-ratio: 4/3; background: #000; border: 2px solid #e2e8f0; }
@@ -39,12 +39,12 @@
     <div id="loginScreen" class="fixed inset-0 bg-slate-50 z-50 flex flex-col items-center justify-center p-6 hidden">
         <div class="bg-white p-8 rounded-3xl w-full max-w-sm border border-slate-200 shadow-xl">
             <div class="text-center mb-8 flex flex-col items-center gap-4">
-                <i class="fa-solid fa-shield-halved text-5xl text-emerald-600"></i> 
-                <h2 class="text-3xl font-black text-slate-900 tracking-tighter">PICKAPP <span class="text-emerald-600">PRO</span></h2>
+                <i class="fa-solid fa-barcode text-5xl text-blue-600"></i> 
+                <h2 class="text-3xl font-black text-slate-900 tracking-tighter">PICKAPP <span class="text-blue-600">PRO</span></h2>
             </div>
-            <input type="text" id="userInp" placeholder="ID Operatore" class="w-full bg-slate-100 text-slate-900 border border-slate-200 p-4 rounded-xl mb-4 outline-none focus:border-emerald-500 transition font-mono">
-            <input type="password" id="passInp" placeholder="PIN" inputmode="numeric" class="w-full bg-slate-100 text-slate-900 border border-slate-200 p-4 rounded-xl mb-6 outline-none focus:border-emerald-500 transition font-mono tracking-widest text-center text-xl">
-            <button onclick="verifyLogin()" id="loginBtn" class="w-full brand-bg text-white font-bold p-4 rounded-xl hover:bg-emerald-600 active:scale-95 transition shadow-lg">
+            <input type="text" id="userInp" placeholder="ID Operatore" class="w-full bg-slate-100 text-slate-900 border border-slate-200 p-4 rounded-xl mb-4 outline-none focus:border-blue-500 transition font-mono">
+            <input type="password" id="passInp" placeholder="PIN" inputmode="numeric" class="w-full bg-slate-100 text-slate-900 border border-slate-200 p-4 rounded-xl mb-6 outline-none focus:border-blue-500 transition font-mono tracking-widest text-center text-xl">
+            <button onclick="verifyLogin()" id="loginBtn" class="w-full brand-bg-blue text-white font-bold p-4 rounded-xl hover:bg-blue-600 active:scale-95 transition shadow-lg">
                 Sblocca Terminale
             </button>
         </div>
@@ -65,9 +65,9 @@
         
         <header class="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm px-4 py-3 flex justify-between items-center">
             <div class="flex items-center gap-3">
-                <i class="fa-solid fa-shield-halved text-2xl text-emerald-600"></i> 
+                <i class="fa-solid fa-barcode text-2xl text-blue-600"></i> 
                 <div class="flex flex-col">
-                    <h1 class="text-lg font-black tracking-tight text-slate-950">PICKAPP <span class="text-emerald-600">PRO</span></h1>
+                    <h1 class="text-lg font-black tracking-tight text-slate-950">PICKAPP <span class="text-blue-600">PRO</span></h1>
                     <div class="flex items-center gap-1.5 text-xs text-slate-500">
                         <div id="connectionDot" class="connection-status status-offline"></div>
                         <span id="connectionText">Offline</span>
@@ -101,7 +101,7 @@
                     <div class="laser-box">
                         <div class="laser-line"></div>
                         <div class="absolute -bottom-10 left-0 w-full text-center">
-                            <span class="text-xs brand-text font-bold uppercase tracking-widest bg-emerald-100 px-3 py-1 rounded-full border brand-border">INQUADRA IL CODICE</span>
+                            <span class="text-xs brand-text-blue font-bold uppercase tracking-widest bg-blue-100 px-3 py-1 rounded-full border brand-border-blue">INQUADRA IL CODICE</span>
                         </div>
                     </div>
                 </div>
@@ -158,7 +158,7 @@
             const dot = document.getElementById('connectionDot');
             const text = document.getElementById('connectionText');
             if(isOnline) {
-                dot.className = 'connection-status status-online'; text.innerText = 'Connesso'; text.className = 'brand-text';
+                dot.className = 'connection-status status-online'; text.innerText = 'Connesso'; text.className = 'brand-text-blue';
             } else {
                 dot.className = 'connection-status status-offline'; text.innerText = 'Offline'; text.className = 'text-slate-500';
             }
@@ -329,7 +329,6 @@
     </script>
 </body>
 </html>
-
 
 
 
