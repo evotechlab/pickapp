@@ -3,141 +3,202 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#2196F3">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>PickApp Pro</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link rel="manifest" href="./manifest.json">
-    <link rel="apple-touch-icon" href="./icon-512.png">
-    
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js')
-            .then(reg => {
-              console.log('Service Worker registrato con successo:', reg.scope);
-            })
-            .catch(err => {
-              console.error('Errore registrazione Service Worker:', err);
-            });
-        });
-      }
-    </script>
-    <script src="https://unpkg.com/html5-qrcode"></script>
+    <title>Scanner Magazzino</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --primary: #2196F3; --success: #4CAF50; --danger: #F44336; --bg: #121212; --surface: #FFFFFF; }
-        * { box-sizing: border-box; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { margin: 0; background: var(--bg); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        .app-bar { background: var(--surface); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; }
-        .app-bar h1 { margin: 0; font-size: 18px; color: var(--primary); }
-        #scanner-wrapper { flex: 1; position: relative; background: #000; }
-        #reader { width: 100% !important; height: 100% !important; }
-        .scanner-overlay { position: absolute; top:0; left:0; width:100%; height:100%; display:flex; justify-content:center; align-items:center; pointer-events:none; z-index:10; }
-        .reticle { width: 260px; height: 160px; border: 2px solid rgba(255,255,255,0.4); border-radius: 16px; box-shadow: 0 0 0 2000px rgba(0,0,0,0.5); }
-        #action-sheet { position: fixed; bottom: 0; left: 0; width: 100%; background: var(--surface); border-radius: 24px 24px 0 0; padding: 24px; transform: translateY(110%); transition: 0.3s ease; z-index: 100; }
-        #action-sheet.active { transform: translateY(0); }
-        .sheet-header { text-align: center; }
-        .qty-picker { display: flex; justify-content: center; align-items: center; gap: 20px; margin: 20px 0; }
-        .btn-round { width: 50px; height: 50px; border-radius: 50%; border: none; background: #eee; font-size: 24px; }
-        #qty-input { width: 80px; height: 50px; text-align: center; font-size: 24px; font-weight: bold; border: 1px solid #ddd; border-radius: 8px; }
-        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .btn-main { height: 60px; border: none; border-radius: 12px; color: white; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .btn-in { background: var(--success); }
-        .btn-out { background: var(--danger); }
-        .feedback-overlay { position: absolute; top:0; left:0; width:100%; height:100%; border-radius:24px 24px 0 0; display:none; flex-direction:column; align-items:center; justify-content:center; z-index:110; color:white; }
-        .feedback-overlay.show { display: flex; }
-        .spin { animation: rotation 1s infinite linear; }
-        @keyframes rotation { from { transform: rotate(0deg); } to { transform: rotate(359deg); } }
+        body { -webkit-tap-highlight-color: transparent; }
+        /* Toast Notification */
+        #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); color: white; padding: 12px 24px; border-radius: 50px; font-weight: bold; transition: all 0.3s ease; opacity: 0; z-index: 50; }
+        #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        #toast.error { background-color: #ef4444; }
+        #toast.success { background-color: #10b981; }
     </style>
 </head>
-<body>
-    <header class="app-bar">
-        <h1>PICKAPP PRO</h1>
-        <span class="material-icons" id="status-icon" style="color: var(--success)">cloud_done</span>
+<body class="bg-gray-100 min-h-screen flex flex-col text-gray-800">
+
+    <header class="bg-slate-800 text-white p-4 flex justify-between items-center shadow-md">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-barcode text-xl"></i>
+            <h1 class="text-lg font-bold">WMS Scanner</h1>
+        </div>
+        <button onclick="logout()" class="text-slate-300 hover:text-white" title="Disconnetti">
+            <i class="fa-solid fa-right-from-bracket"></i>
+        </button>
     </header>
-    <main id="scanner-wrapper">
-        <div id="reader"></div>
-        <div class="scanner-overlay"><div class="reticle"></div></div>
-    </main>
-    <section id="action-sheet">
-        <div class="feedback-overlay" id="feedback"></div>
-        <div class="sheet-header">
-            <h2 style="margin:0">Oggetto Rilevato</h2>
-            <p id="ui-barcode" style="font-family:monospace; color:#666">---</p>
+
+    <div id="toast">Messaggio</div>
+
+    <div id="loginScreen" class="flex-1 flex flex-col items-center justify-center p-6 hidden">
+        <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-sm text-center">
+            <i class="fa-brands fa-dropbox text-5xl text-blue-600 mb-4"></i>
+            <h2 class="text-2xl font-bold mb-2">Connetti Server</h2>
+            <p class="text-gray-500 mb-6 text-sm">Accedi per abilitare lo scanner.</p>
+            <button onclick="loginDropbox()" id="loginBtn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 active:scale-95 transition flex justify-center items-center gap-2">
+                <i class="fa-solid fa-link"></i> Autorizza Dropbox
+            </button>
         </div>
-        <div class="qty-picker">
-            <button class="btn-round" onclick="changeQty(-1)">-</button>
-            <input type="number" id="qty-input" value="1" inputmode="numeric">
-            <button class="btn-round" onclick="changeQty(1)">+</button>
+    </div>
+
+    <div id="appScreen" class="flex-1 flex flex-col items-center justify-center p-4 hidden">
+        <div class="bg-white p-6 rounded-2xl shadow-lg w-full max-w-sm">
+            
+            <div class="text-center mb-6">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Codice a Barre</p>
+                <input type="text" id="barcodeInput" placeholder="Scansiona o digita..." class="w-full text-center text-3xl font-bold p-4 bg-gray-50 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-0 outline-none uppercase transition">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="processMovement('IN')" class="bg-emerald-500 text-white font-bold py-6 rounded-xl hover:bg-emerald-600 active:scale-95 transition shadow-md flex flex-col items-center justify-center gap-2">
+                    <i class="fa-solid fa-box-open text-2xl"></i>
+                    <span class="text-lg">STOCK (IN)</span>
+                </button>
+                <button onclick="processMovement('OUT')" class="bg-rose-500 text-white font-bold py-6 rounded-xl hover:bg-rose-600 active:scale-95 transition shadow-md flex flex-col items-center justify-center gap-2">
+                    <i class="fa-solid fa-dolly text-2xl"></i>
+                    <span class="text-lg">PICK (OUT)</span>
+                </button>
+            </div>
+
+            <div id="loader" class="hidden mt-6 text-center text-blue-600 font-bold animate-pulse">
+                <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Elaborazione in corso...
+            </div>
+
         </div>
-        <div class="btn-grid">
-            <button id="btn-out" class="btn-main btn-out" onclick="send('OUT')"><span class="material-icons">logout</span> USCITA</button>
-            <button id="btn-in" class="btn-main btn-in" onclick="send('IN')"><span class="material-icons">login</span> INGRESSO</button>
-        </div>
-        <button onclick="closeSheet()" style="width:100%; background:none; border:none; color:#999; margin-top:15px">ANNULLA</button>
-    </section>
+    </div>
+
     <script>
-        const WORKER_URL = "https://tyxghf.sviluppo-49a.workers.dev/";
-        let scanner;
-        let activeCode = "";
-        let busy = false;
+        // ==========================================
+        // CONFIGURAZIONE: INSERISCI QUI IL TUO WORKER
+        // ==========================================
+        const WORKER_URL = "https://https://tyxghf.sviluppo-49a.workers.dev/";
 
-        function start() {
-            scanner = new Html5Qrcode("reader");
-            scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (code) => {
-                if(busy || code === activeCode) return;
-                activeCode = code;
-                if(navigator.vibrate) navigator.vibrate(80);
-                document.getElementById('ui-barcode').innerText = code;
-                document.getElementById('action-sheet').classList.add('active');
-            });
+        let accessToken = localStorage.getItem("wms_access_token");
+
+        // Inizializzazione
+        document.addEventListener('DOMContentLoaded', () => {
+            handleRedirect();
+            checkAuth();
+        });
+
+        // Mostra schermata corretta in base al token
+        function checkAuth() {
+            if (accessToken) {
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('appScreen').classList.remove('hidden');
+                document.getElementById('appScreen').classList.add('flex');
+                document.getElementById('barcodeInput').focus(); // Auto-focus per lo scanner laser
+            } else {
+                document.getElementById('loginScreen').classList.remove('hidden');
+                document.getElementById('appScreen').classList.add('hidden');
+                document.getElementById('appScreen').classList.remove('flex');
+            }
         }
 
-        function changeQty(n) {
-            let i = document.getElementById('qty-input');
-            let v = parseInt(i.value) + n;
-            if(v > 0) i.value = v;
-        }
-
-        function closeSheet() {
-            document.getElementById('action-sheet').classList.remove('active');
-            activeCode = "";
-        }
-
-        async function send(type) {
-            if(busy) return;
-            busy = true;
-            const icon = document.getElementById('status-icon');
-            const fb = document.getElementById('feedback');
-            icon.innerText = "sync"; icon.classList.add("spin");
+        // Chiede al Worker l'URL di Dropbox e reindirizza
+        async function loginDropbox() {
+            const btn = document.getElementById('loginBtn');
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Attendere...';
+            btn.disabled = true;
 
             try {
                 const res = await fetch(WORKER_URL, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ barcode: activeCode, type: type, qty: document.getElementById('qty-input').value, date: new Date().toISOString() })
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "getAuthUrl" })
                 });
                 const data = await res.json();
-                if(res.ok) {
-                    fb.style.background = "var(--success)";
-                    fb.innerHTML = '<span class="material-icons" style="font-size:48px">check_circle</span><p>OK!</p>';
-                    fb.classList.add('show');
-                    setTimeout(() => { fb.classList.remove('show'); closeSheet(); busy = false; icon.innerText = "cloud_done"; }, 1500);
+                if (data.success && data.url) {
+                    window.location.href = data.url;
                 } else {
-                    fb.style.background = "var(--danger)";
-                    fb.innerHTML = `<span class="material-icons" style="font-size:48px">error</span><p>${data.error}</p>`;
-                    fb.classList.add('show');
-                    setTimeout(() => { fb.classList.remove('show'); busy = false; icon.innerText = "priority_high"; }, 3000);
+                    showToast("Errore di configurazione del server", "error");
+                    btn.innerHTML = '<i class="fa-solid fa-link"></i> Autorizza Dropbox';
+                    btn.disabled = false;
                 }
-            } catch(e) {
-                alert("Errore di rete");
-                busy = false;
-            } finally { icon.classList.remove("spin"); }
+            } catch (e) {
+                showToast("Server irraggiungibile", "error");
+                btn.innerHTML = '<i class="fa-solid fa-link"></i> Autorizza Dropbox';
+                btn.disabled = false;
+            }
         }
-        window.onload = start;
+
+        // Estrae il token dall'URL dopo il rientro da Dropbox
+        function handleRedirect() {
+            const hash = window.location.hash;
+            if (hash && hash.includes("access_token")) {
+                const params = new URLSearchParams(hash.substring(1));
+                const token = params.get("access_token");
+                if (token) {
+                    accessToken = token;
+                    localStorage.setItem("wms_access_token", accessToken);
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            }
+        }
+
+        // Elabora l'operazione IN o OUT
+        async function processMovement(type) {
+            const barcodeInput = document.getElementById('barcodeInput');
+            const barcode = barcodeInput.value.trim().toUpperCase();
+
+            if (!barcode) {
+                showToast("Inserisci o scansiona un codice!", "error");
+                barcodeInput.focus();
+                return;
+            }
+
+            document.getElementById('loader').classList.remove('hidden');
+            
+            try {
+                const res = await fetch(WORKER_URL, {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${accessToken}`
+                    },
+                    body: JSON.stringify({
+                        action: "processMovement",
+                        barcode: barcode,
+                        type: type
+                    })
+                });
+
+                const data = await res.json();
+
+                if (res.status === 401 || (data.error && data.error.includes("expired"))) {
+                    logout("Sessione scaduta, esegui nuovo accesso.");
+                    return;
+                }
+
+                if (data.success) {
+                    showToast(`${barcode} registrato come ${type} con successo!`, "success");
+                    barcodeInput.value = ""; // Svuota il campo per il prossimo oggetto
+                    barcodeInput.focus();
+                } else {
+                    showToast(data.error || "Errore sconosciuto", "error");
+                    barcodeInput.focus();
+                }
+
+            } catch (e) {
+                showToast("Errore di rete. Riprova.", "error");
+            } finally {
+                document.getElementById('loader').classList.add('hidden');
+            }
+        }
+
+        function showToast(msg, type = "success") {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.className = type;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3500);
+        }
+
+        function logout(msg = null) {
+            localStorage.removeItem("wms_access_token");
+            accessToken = null;
+            checkAuth();
+            if(msg) alert(msg);
+        }
     </script>
 </body>
 </html>
