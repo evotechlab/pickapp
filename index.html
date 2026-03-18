@@ -7,6 +7,16 @@
     <title>PickApp Pro</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="manifest" href="manifest.json">
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('SW registrato!', reg))
+            .catch(err => console.log('Errore SW', err));
+        });
+      }
+    </script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #2196F3; --success: #4CAF50; --danger: #F44336; --bg: #121212; --surface: #FFFFFF; }
