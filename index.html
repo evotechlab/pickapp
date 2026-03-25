@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
     <style>
         body { -webkit-tap-highlight-color: transparent; background-color: #f8fafc; color: #1e293b; overscroll-behavior-y: none; font-family: system-ui, -apple-system, sans-serif; }
         
@@ -63,7 +64,8 @@
 
     <div id="scannerScreen" class="hidden flex flex-col flex-1 pb-[env(safe-area-inset-bottom)]">
         
-        <header class="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm px-4 py-3 flex justify-between items-center">
+<header class="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm px-4 py-3 flex justify-between items-center">
+            
             <div class="flex items-center gap-3">
                 <i class="fa-solid fa-barcode text-2xl text-blue-600"></i> 
                 <div class="flex flex-col">
@@ -74,9 +76,22 @@
                     </div>
                 </div>
             </div>
-            <button onclick="hardLogout()" class="text-slate-400 hover:text-rose-600 p-2 rounded-lg hover:bg-rose-50 transition" title="Disconnetti">
-                <i class="fa-solid fa-power-off text-lg"></i>
-            </button>
+
+            <div class="flex items-center gap-2">
+                
+                <div id="syncBadgeContainer" class="relative hidden cursor-pointer transition-transform active:scale-95" onclick="processSyncQueue(true)">
+                    <div class="bg-slate-100 p-2 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition" title="Sincronizza Dati">
+                        <i class="fas fa-cloud-upload-alt text-lg"></i>
+                    </div>
+                    <span id="syncBadgeCount" class="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-bold h-4 w-4 flex items-center justify-center rounded-full shadow-sm">0</span>
+                </div>
+
+                <button onclick="hardLogout()" class="text-slate-400 hover:text-rose-600 p-2 rounded-lg hover:bg-rose-50 transition" title="Disconnetti">
+                    <i class="fa-solid fa-power-off text-lg"></i>
+                </button>
+                
+            </div>
+            
         </header>
 
         <main class="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
@@ -326,6 +341,166 @@
             if (html5QrcodeScanner) html5QrcodeScanner.stop();
             window.location.reload();
         }
+
+        /* ================= MOTORE OFFLINE FIRST (INDEXED-DB) ================= */
+
+// 1. IL NUOVO TASTO INVIA (Salva solo sul telefono)
+async function uploadData() {
+    const op = document.getElementById('operatore').value.trim();
+    const impRaw = document.getElementById('impianto').value.trim();
+    const luogoRaw = document.getElementById('luogo').value.trim() || "ND";
+    const potRaw = document.getElementById('potenza').value.trim() || "0";
+    const zRaw = document.getElementById('zona').value;
+    const sRaw = document.getElementById('stato').value;
+
+    if(!op || !impRaw || !zRaw || !sRaw || photoFilesQueue.length === 0) {
+        showToast("Compila i campi essenziali e scatta almeno una foto.", "error");
+        return;
+    }
+
+    // Creiamo il pacchetto da salvare offline
+    const sessionPayload = {
+        id: "sess_" + Date.now(),
+        timestamp: new Date().getTime(),
+        operatore: op, impianto: impRaw, luogo: luogoRaw, potenza: potRaw,
+        zona: zRaw, stato: sRaw, gps: gpsData,
+        // Salviamo fisicamente gli oggetti File nel database del telefono
+        photos: photoFilesQueue.map(p => p.file) 
+    };
+
+    try {
+        // Leggiamo la coda attuale, aggiungiamo il nuovo, e salviamo
+        let queue = await idbKeyval.get('fieldcam_queue') || [];
+        queue.push(sessionPayload);
+        await idbKeyval.set('fieldcam_queue', queue);
+
+        // Feedback immediato per l'operatore (zero attesa!)
+        showToast("Dati salvati in locale! <i class='fas fa-hdd ml-1'></i>");
+        
+        sessionUploadedPhotos += sessionPayload.photos.length;
+        document.getElementById('photoCountText').innerText = sessionUploadedPhotos;
+        document.getElementById('sessionFeedback').style.display = "flex";
+        document.getElementById('sessionFeedback').classList.remove('hidden');
+
+        if(!isSessionLocked) lockSessionUI();
+        softResetCamera();
+        
+        // Aggiorna il numerino rosso e prova subito a inviare se c'è rete
+        updateSyncBadge();
+        processSyncQueue();
+
+    } catch (e) {
+        showToast("Errore di memoria del telefono.", "error");
+        console.error(e);
+    }
+}
+
+// 2. IL MOTORE DI SINCRONIZZAZIONE (Invia a Dropbox in background)
+let isSyncing = false;
+
+async function processSyncQueue(manualClick = false) {
+    if (isSyncing) return;
+    
+    // Se clicchi la nuvola ma non c'è rete
+    if (!navigator.onLine) {
+        if(manualClick) showToast("Sei offline. In attesa di rete...", "error");
+        return;
+    }
+
+    let queue = await idbKeyval.get('fieldcam_queue') || [];
+    if (queue.length === 0) {
+        if(manualClick) showToast("Tutto sincronizzato!");
+        return;
+    }
+
+    isSyncing = true;
+    const loader = document.getElementById('loaderOverlay');
+    const progressFill = document.getElementById('progressFill');
+    
+    // Se lo fa in automatico in background non disturba l'utente, 
+    // se clicca la nuvola mostriamo il loader
+    if(manualClick) loader.classList.remove('hidden');
+
+    try {
+        // Processiamo i pacchetti in ordine cronologico (il più vecchio prima)
+        for (let i = 0; i < queue.length; i++) {
+            const session = queue[i];
+            
+            if(manualClick) document.getElementById('loaderText').innerText = `Invio pacchetto ${i+1} di ${queue.length}...`;
+            
+            // --- LOGICA DI INVIO REALE ---
+            const safeOp = session.operatore.replace(/[^a-zA-Z0-9]/g, '_');
+            const safeImp = session.impianto.replace(/[^a-zA-Z0-9]/g, '_');
+            const safeLuogo = session.luogo.replace(/[^a-zA-Z0-9]/g, '_');
+
+            const impiantoFolder = `${safeImp}_${safeLuogo}_${session.potenza}MW`;
+            const targetFolderPath = `${impiantoFolder}/${session.stato}/${session.zona}`;
+
+            const d = new Date(session.timestamp);
+            const dStr = d.toISOString().split('T')[0];
+            const tStr = d.toTimeString().split(' ')[0].replace(/:/g, '-');
+            
+            const photoPrefix = `${dStr}_${tStr}_${safeOp}`;
+            const photoNames = session.photos.map((_, idx) => `${photoPrefix}_Foto_${String(idx + 1).padStart(2, '0')}.jpg`);
+
+            const masterData = { operatore: session.operatore, impianto: session.impianto, potenza: session.potenza, luogo: session.luogo, ultimo_aggiornamento: d.toISOString() };
+            await proxyFetch(`${impiantoFolder}/dati_cantiere.json`, JSON.stringify(masterData, null, 2), true);
+
+            const sessionData = { id_sessione: `${dStr}_${tStr}`, operatore: session.operatore, impianto: session.impianto, zona: session.zona, stato: session.stato, gps: session.gps, foto_allegate: photoNames };
+            await proxyFetch(`${targetFolderPath}/report_sessione_${dStr}_${tStr}.json`, JSON.stringify(sessionData, null, 2), true);
+
+            for (let j = 0; j < session.photos.length; j++) {
+                if(manualClick) {
+                    document.getElementById('loaderText').innerText = `Invio foto ${j+1} di ${session.photos.length}...`;
+                    progressFill.style.width = `${((j+1) / session.photos.length) * 100}%`;
+                }
+                await proxyFetch(`${targetFolderPath}/${photoNames[j]}`, session.photos[j], false);
+            }
+            // --- FINE LOGICA DI INVIO ---
+
+            // Se tutto è andato bene, rimuoviamo questo pacchetto dalla coda offline
+            let currentQueue = await idbKeyval.get('fieldcam_queue');
+            currentQueue = currentQueue.filter(q => q.id !== session.id);
+            await idbKeyval.set('fieldcam_queue', currentQueue);
+            updateSyncBadge();
+        }
+
+        if(manualClick) showToast("Tutti i dati sono stati sincronizzati!");
+
+    } catch (e) {
+        if(manualClick) showToast("Rete instabile. L'invio riprenderà in automatico.", "error");
+        console.error("Errore sync background:", e);
+    } finally {
+        if(manualClick) loader.classList.add('hidden');
+        isSyncing = false;
+        updateSyncBadge();
+    }
+}
+
+// 3. AGGIORNA LA UI & LISTENER DELLA RETE
+async function updateSyncBadge() {
+    const queue = await idbKeyval.get('fieldcam_queue') || [];
+    const container = document.getElementById('syncBadgeContainer');
+    const countEl = document.getElementById('syncBadgeCount');
+    
+    if (queue.length > 0) {
+        container.classList.remove('hidden');
+        countEl.innerText = queue.length;
+    } else {
+        container.classList.add('hidden');
+    }
+}
+
+// Quando l'app parte, aggiorna la nuvoletta
+document.addEventListener('DOMContentLoaded', () => {
+    updateSyncBadge();
+});
+
+// Ascoltiamo il telefono: appena torna internet, fai partire il sync da solo!
+window.addEventListener('online', () => {
+    showToast("Sei di nuovo online! Sincronizzazione in background avviata...");
+    processSyncQueue();
+});
     </script>
 </body>
 </html>
